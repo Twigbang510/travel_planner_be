@@ -5,6 +5,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { ConfigModule } from './module/config/config.module';
 
 import { AppConfigService } from './module/config/app-config.service';
+import { TokenModule } from './module/token/token.module';
 
 @Module({
   imports: [
@@ -25,6 +26,8 @@ import { AppConfigService } from './module/config/app-config.service';
       }),
       inject: [AppConfigService],
     }),
+    
+    TokenModule,
   ],
 })
 export class AppModule {}

@@ -42,4 +42,12 @@ export class AppConfigService {
   get sqlDatabase(): string {
     return this.configService.get<string>('DB_DATABASE');
   }
+
+  get jwtSecretKey(): string {
+    return this.configService.get<string>('JWT_SECRET_KEY');
+  }
+
+  get jwtDuration(): string {
+    return this.configService.get<string>('JWT_DURATION');
+  }
 }

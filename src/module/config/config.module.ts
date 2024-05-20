@@ -3,9 +3,11 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import { AppConfigService } from './app-config.service';
 
 @Module({
-  imports: [NestConfigModule.forRoot({
-    isGlobal: true,
-  })],
+  imports: [
+    NestConfigModule.forRoot({
+      isGlobal: true,
+    }),
+  ],
   providers: [AppConfigService],
   exports: [AppConfigService],
 })

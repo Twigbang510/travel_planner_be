@@ -1,7 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
-import { DatabaseModule } from '../database/database.module';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { User } from './entities/user.entity';
 
@@ -12,8 +11,6 @@ import { User } from './entities/user.entity';
     UserService,
     // UserRepository,
   ],
-  exports: [
-    UserService
-  ]
+  exports: [UserService],
 })
 export class UserModule {}

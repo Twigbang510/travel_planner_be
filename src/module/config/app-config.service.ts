@@ -4,7 +4,6 @@ import { Dialect } from 'sequelize';
 
 @Injectable()
 export class AppConfigService {
-
   constructor(private readonly configService: ConfigService) {}
 
   get port(): number {
@@ -20,27 +19,27 @@ export class AppConfigService {
   }
 
   get salt(): number {
-    return this.configService.get<number>('salt');
+    return Number(this.configService.get<number>('SALT'));
   }
 
-  get sqlDialect(): Dialect { 
-    return this.configService.get<string>('DB_DIALECT') as Dialect
+  get sqlDialect(): Dialect {
+    return this.configService.get<string>('DB_DIALECT') as Dialect;
   }
 
-  get sqlHost(): string { 
-    return this.configService.get<string>('DB_HOST')
+  get sqlHost(): string {
+    return this.configService.get<string>('DB_HOST');
   }
 
-  get sqlPort(): number { 
-    return this.configService.get<number>('DB_PORT')
+  get sqlPort(): number {
+    return this.configService.get<number>('DB_PORT');
   }
-  get sqlUsername(): string { 
-    return this.configService.get<string>('DB_USERNAME')
+  get sqlUsername(): string {
+    return this.configService.get<string>('DB_USERNAME');
   }
-  get sqlPassword(): string { 
-    return this.configService.get<string>('DB_PASSWORD')
+  get sqlPassword(): string {
+    return this.configService.get<string>('DB_PASSWORD');
   }
-  get sqlDatabase(): string { 
-    return this.configService.get<string>('DB_DATABASE')
+  get sqlDatabase(): string {
+    return this.configService.get<string>('DB_DATABASE');
   }
 }

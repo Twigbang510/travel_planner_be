@@ -10,21 +10,18 @@ export class UserService {
     private userModel: typeof User,
   ) {}
   async create(user: CreateUserDto): Promise<User> {
+    const newUser = await this.userModel.create<User>(user);
 
-    const newUser = await this.userModel.create<User>(user)
-
-    if (newUser) return newUser.dataValues
-
-
+    if (newUser) return newUser.dataValues;
   }
   async findOneByEmail(email: string): Promise<User> {
     const user = await this.userModel.findOne<User>({
       where: { email: email },
     });
-
+    console.log(user);
     if (user) return user.dataValues;
   }
-  async findAll():Promise<User[]> {
+  async findAll(): Promise<User[]> {
     return this.userModel.findAll();
   }
 

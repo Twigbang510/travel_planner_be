@@ -1,9 +1,7 @@
 import { Controller, Post, Get, Req, Param, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { request } from 'http';
-import { AuthDto } from './dto/auth.dto';
 import { CreateUserDto } from '../user/dto';
-import * as argon from 'argon2'
+import { UserDto } from '../user/dto/login-user.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -13,11 +11,11 @@ export class AuthController {
     try {
       const createdUser = await this.authService.register(user);
       delete createdUser.password;
-      console.log('Tao o day',createdUser)
-      return createdUser
-    } catch (err ) {
-      return err.response
+      console.log('Tao o day', createdUser);
+      return createdUser;
+    } catch (err) {
+      return err.response;
     }
-
   }
+
 }

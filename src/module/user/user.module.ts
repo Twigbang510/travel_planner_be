@@ -8,7 +8,8 @@ import { PassportModule } from '@nestjs/passport';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    SequelizeModule.forFeature([User])],
+    SequelizeModule.forFeature([User]),
+  ],
   controllers: [UserController],
   providers: [
     UserService,

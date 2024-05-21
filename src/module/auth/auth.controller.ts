@@ -19,10 +19,10 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() user: LoginUserDto): Promise<string> {
-    const {email, password} = user
+    const { email, password } = user;
     return this.authService.login({
       email: email,
-      password: password
-    })
+      password: password,
+    });
   }
 }

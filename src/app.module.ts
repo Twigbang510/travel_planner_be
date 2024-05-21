@@ -6,6 +6,8 @@ import { ConfigModule } from './module/config/config.module';
 
 import { AppConfigService } from './module/config/app-config.service';
 import { TokenModule } from './module/token/token.module';
+import { GooglemapsPlaceModule } from './module/googlemaps-place/googlemaps-place.module';
+import { PlacesModule } from './module/places/places.module';
 
 @Module({
   imports: [
@@ -26,8 +28,12 @@ import { TokenModule } from './module/token/token.module';
       }),
       inject: [AppConfigService],
     }),
-    
+
     TokenModule,
+
+    GooglemapsPlaceModule,
+
+    PlacesModule,
   ],
 })
 export class AppModule {}

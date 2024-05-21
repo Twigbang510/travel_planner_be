@@ -16,7 +16,7 @@ export class AuthService {
   constructor(
     private userService: UserService,
     private configService: AppConfigService,
-    private tokenService: TokenService
+    private tokenService: TokenService,
   ) {}
 
   async hashPassword(password: string): Promise<string> {
@@ -32,7 +32,7 @@ export class AuthService {
 
   async validateUser({ email, password }: LoginUserDto): Promise<boolean> {
     const user = await this.userService.findOneByEmail(email);
-    
+
     if (!user) return false;
 
     const isValid = await this.checkPassword(password, user.password);

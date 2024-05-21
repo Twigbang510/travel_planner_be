@@ -11,7 +11,6 @@ export class AuthController {
     try {
       const createdUser = await this.authService.register(user);
       delete createdUser.password;
-      console.log('Tao o day', createdUser);
       return createdUser;
     } catch (err) {
       return err.response;

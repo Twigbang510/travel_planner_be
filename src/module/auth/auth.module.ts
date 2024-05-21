@@ -8,6 +8,7 @@ import { TokenModule } from '../token/token.module';
 import { TokenService } from '../token/token.service';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
+
 @Module({
   imports: [UserModule, ConfigModule, TokenModule, JwtModule],
   controllers: [AuthController],

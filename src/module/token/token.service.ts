@@ -9,7 +9,7 @@ export class TokenService {
     private jwtService: JwtService,
     private configService: AppConfigService,
   ) {}
-  signJWTToken({ id, duration }: JwtPayload): string {
+  async signJWTToken({ id, duration }: JwtPayload):Promise<string> {
     const token = this.jwtService.sign(
       {
         id,
@@ -22,8 +22,8 @@ export class TokenService {
     return token;
   }
 
-  async getToken(id: number): Promise<string> {
-    const accessToken = this.signJWTToken({
+  async getToken(id: string): Promise<string> {
+    const accessToken = await this.signJWTToken({
       id: id,
       duration: this.configService.jwtDuration,
     });

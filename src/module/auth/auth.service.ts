@@ -54,7 +54,6 @@ export class AuthService {
 
   async login({ email, password }: LoginUserDto): Promise<string> {
     const checkUser: boolean = await this.validateUser({ email, password });
-    console.log( checkUser)
     if (!checkUser) throw new UnauthorizedException();
 
     const userData: User = await this.userService.findOneByEmail(email);

@@ -18,15 +18,15 @@ export class UserService {
     const user = await this.userModel.findOne<User>({
       where: { email: email },
     });
-    console.log(user);
     if (user) return user.dataValues;
   }
   async findAll(): Promise<User[]> {
     return this.userModel.findAll();
   }
 
-  findOne(id: number) {
-    return this.userModel.findOne();
+  async findOneById(id: string): Promise<User> {
+    const user = await this.userModel.findOne<User>({ where: {id: id}});
+    if (user) return user.dataValues
   }
 
   update(id: number, updateUserDto: UpdateUserDto) {

@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
-import { LanguageServiceClient } from '@google-cloud/language';
+import { LanguageServiceClient, protos } from '@google-cloud/language';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -61,6 +61,7 @@ export class GooglemapsPlaceService {
         })),
       );
 
+      console.log('Results:', results);
       return results;
     } catch (error) {
       throw new HttpException(
@@ -80,6 +81,15 @@ export class GooglemapsPlaceService {
       });
 
       const reviews = response.data.result.reviews || [];
+      console.log('Place Id', placeId, 'Review', reviews);
+
+      // If you want to analyze sentiment of the reviews
+      const Sentiment = require('sentiment');
+      const sentiment = new Sentiment();
+      const analyzedReviews = reviews.map(review => ({
+        ...review,
+        sentiment: sentiment.analyze(review.text),
+      }));
 
       return {
         place_id: placeId,
@@ -93,5 +103,29 @@ export class GooglemapsPlaceService {
       );
     }
   }
+  async analyzeTextSentiment(text: string): Promise<any> {
+    const document: protos.google.cloud.language.v1.Document = {
+      language: 'en',
+      content: text,
+      type: protos.google.cloud.language.v1.Document.Type.PLAIN_TEXT,
+      toJSON: function (): { [k: string]: any; } {
+        throw new Error('Function not implemented.');
+      }
+    };
 
+    try {
+      const [result] = await this.client.analyzeSentiment({ document });
+      console.log(result);
+      const sentiment = result.documentSentiment;
+      console.log(`Text: ${text}`);
+      console.log(`Sentiment score: ${sentiment.score}`);
+      console.log(`Sentiment magnitude: ${sentiment.magnitude}`);
+
+      return result.sentences;
+
+    } catch (error) {
+      console.error('Error analyzing sentiment', error);
+      throw error;
+    }
+  }
 }

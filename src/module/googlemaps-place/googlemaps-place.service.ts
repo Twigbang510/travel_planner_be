@@ -3,6 +3,7 @@ import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { PredictionServiceClient } from '@google-cloud/aiplatform';
+import { SentimentResult } from './interface/sentimen-result.interface';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -15,6 +16,14 @@ export class GooglemapsPlaceService {
     this.googleMapsClient = new Client({});
   }
 
+  async getBestPlace(results: SentimentResult[]): Promise<{ place_id: string; score: number; }> {
+    if (!results.length ) return null;
+
+    const bestPlace = results.reduce((prevBest, current) => {
+      return current.score > prevBest.score ? current : prevBest;
+    });
+    return {place_id: bestPlace.place_id, score: bestPlace.score}
+  }
   async getPlaceDetails(placeId: string) {
     try {
       if (!placeId) {
@@ -58,10 +67,17 @@ export class GooglemapsPlaceService {
       const place_reviews = await Promise.all(
         response.data.results.map(async (place) => {
           const reviews = await this.getPlaceReviews(place.place_id);
-          return reviews ? reviews : [];
+          return reviews ? reviews : { place_id: place.place_id, reviews: [] };
         }),
       );
-      return place_reviews;
+      const review_scoure: SentimentResult[] = await Promise.all(
+        place_reviews.map(async (place) => {
+          const sentiment = await this.analyzeSentiment(place);
+          return sentiment;
+        }),
+      )
+      const bestPlace = await this.getBestPlace(review_scoure)
+      return bestPlace;
     } catch (error) {
       throw new HttpException(
         'Error fetching nearby places',
@@ -89,19 +105,18 @@ export class GooglemapsPlaceService {
     }
   }
 
-  async analyzeSentiment(text: any): Promise<number> {
+  async analyzeSentiment(reviews: { place_id: string, reviews: { text: string; }[] }): Promise<SentimentResult> {
+    const text = reviews.reviews.map((review) => review.text).join('\n');
     try {
       const document = {
         content: text,
         type: 'PLAIN_TEXT',
       };
-
       const [result] = await this.client.analyzeSentiment({
         document: document,
       });
       const sentiment = result.documentSentiment;
-      console.log('Scoure', sentiment);
-      return sentiment.score;
+      return { place_id: reviews.place_id, score: sentiment.score };
     } catch (error) {
       console.error(error);
       throw new HttpException(
@@ -111,28 +126,4 @@ export class GooglemapsPlaceService {
     }
   }
 
-  // async getAverageSentimentScore(reviews: string[]) {
-  //   const scores = await Promise.all(
-  //     reviews.map((review) => this.analyzeSentiment(review)),
-  //   );
-  //   const totalScore = scores.reduce((sum, score) => sum + score, 0);
-  //   return totalScore / scores.length;
-  // }
-
-  // async getNearbyPlacesWithSentiment(nearbySearchDto: NearbySearchDto) {
-  //   const places = await this.getNearbyPlaces(nearbySearchDto);
-  //   const placeDetails = await Promise.all(
-  //     places.map(async (place) => {
-  //       const reviews = await this.getPlaceReviews(place.place_id);
-  //       const reviewTexts = reviews.map((review) => review.text);
-  //       const averageSentimentScore =
-  //         await this.getAverageSentimentScore(reviewTexts);
-  //       return {
-  //         place_id: place.place_id,
-  //         averageSentimentScore,
-  //       };
-  //     }),
-  //   );
-  //   return placeDetails;
-  // }
 }

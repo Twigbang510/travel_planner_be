@@ -54,13 +54,13 @@ export class GooglemapsPlaceService {
   }
 
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
-    const { lat, lng, type, radius = 1500 } = nearbySearchDto;
+    const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
     try {
       const response = await this.googleMapsClient.placesNearby({
         params: {
           location: { lat, lng },
           radius,
-          type,
+          type: types,
           key: this.configService.googleMapsKey,
         },
       });
@@ -77,8 +77,10 @@ export class GooglemapsPlaceService {
         }),
       )
       const bestPlace = await this.getBestPlace(review_scoure)
-      return bestPlace;
+      console.log(bestPlace)
+      return place_reviews;
     } catch (error) {
+      console.error(error.response?.data || error.message);
       throw new HttpException(
         'Error fetching nearby places',
         HttpStatus.INTERNAL_SERVER_ERROR,

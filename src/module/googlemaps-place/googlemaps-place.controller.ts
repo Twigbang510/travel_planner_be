@@ -19,8 +19,8 @@ export class GooglemapsPlaceController {
     return this.googlemapsPlaceService.getNearbyPlaces(nearbySearchDto);
   }
 
-  // @Post('sentiment')
-  // getScore(@Body('text') text: string): Promise<any> {
-  //   return this.googlemapsPlaceService.analyzeSentiment(text);
-  // }
+  @Post('sentiment')
+  getScore(@Body() reviews: { place_id: string, reviews: { text: string; }[] }): Promise<any> {
+    return this.googlemapsPlaceService.analyzeSentiment(reviews);
+  }
 }

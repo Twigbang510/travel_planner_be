@@ -3,7 +3,7 @@ import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { PredictionServiceClient } from '@google-cloud/aiplatform';
-import { SentimentResult } from './interface/sentimen-result.interface';
+import { SentimentResult } from './interface/sentiment-result.interface';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -11,6 +11,11 @@ export class GooglemapsPlaceService {
   private aiPlatformClient: PredictionServiceClient;
   private language = require('@google-cloud/language');
   private client = new this.language.LanguageServiceClient();
+  private currentDate = 1;
+  private currentTime = new Date().setHours(6, 0, 0, 0);
+  private endTime = new Date().setHours(20, 0, 0, 0);
+  private placeList = [];
+  private currentTypeIndex: number = 0;
 
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
@@ -55,30 +60,46 @@ export class GooglemapsPlaceService {
 
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
+    const startDate = new Date(date_range[0]);
+    const endDate = new Date(date_range[1]);
+    const total_dates = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
     try {
-      const response = await this.googleMapsClient.placesNearby({
-        params: {
-          location: { lat, lng },
-          radius,
-          type: types,
-          key: this.configService.googleMapsKey,
-        },
-      });
-      const place_reviews = await Promise.all(
-        response.data.results.map(async (place) => {
-          const reviews = await this.getPlaceReviews(place.place_id);
-          return reviews ? reviews : { place_id: place.place_id, reviews: [] };
-        }),
-      );
-      const review_scoure: SentimentResult[] = await Promise.all(
-        place_reviews.map(async (place) => {
-          const sentiment = await this.analyzeSentiment(place);
-          return sentiment;
-        }),
-      )
-      const bestPlace = await this.getBestPlace(review_scoure)
-      console.log(bestPlace)
-      return place_reviews;
+      if (this.currentDate < total_dates) {
+        const placePromises = types.map(async (type) => {
+          const response = await this.googleMapsClient.placesNearby({
+            params: {
+              location: { lat, lng },
+              radius,
+              type: type,
+              key: this.configService.googleMapsKey,
+            },
+          });
+  
+          const place_reviews = await Promise.all(
+            response.data.results.map(async (place) => {
+              const reviews = await this.getPlaceReviews(place.place_id);
+              return reviews ? reviews : { place_id: place.place_id, reviews: [] };
+            }),
+          );
+  
+          const review_scores: SentimentResult[] = await Promise.all(
+            place_reviews.map(async (place) => {
+              const sentiment = await this.analyzeSentiment(place);
+              return sentiment;
+            }),
+          );
+  
+          const bestPlace = await this.getBestPlace(review_scores);
+          return bestPlace;
+
+        });
+  
+        this.placeList = await Promise.all(placePromises);
+        return this.placeList;
+      } else {
+        return this.placeList;
+      }
+  
     } catch (error) {
       console.error(error.response?.data || error.message);
       throw new HttpException(
@@ -87,6 +108,7 @@ export class GooglemapsPlaceService {
       );
     }
   }
+  
 
   async getPlaceReviews(placeId: string) {
     try {

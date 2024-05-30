@@ -12,7 +12,7 @@ export class NearbySearchDto {
   radius?: number;
 
   @ArrayNotEmpty()
-  types: string;
+  types: Array<string>;
 
   @IsDateString({}, { each: true })
   date_range: Date[];

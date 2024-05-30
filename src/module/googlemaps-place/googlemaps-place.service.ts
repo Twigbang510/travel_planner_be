@@ -17,6 +17,100 @@ export class GooglemapsPlaceService {
   private placeList = [];
   private currentTypeIndex: number = 0;
 
+  private average_visit_times = {
+    'accounting': 30,
+    'airport': 120,
+    'amusement_park': 240,
+    'aquarium': 90,
+    'art_gallery': 60,
+    'atm': 5,
+    'bakery': 15,
+    'bank': 30,
+    'bar': 120,
+    'beauty_salon': 90,
+    'bicycle_store': 30,
+    'book_store': 60,
+    'bowling_alley': 120,
+    'bus_station': 30,
+    'cafe': 60,
+    'campground': 180,
+    'car_dealer': 90,
+    'car_rental': 45,
+    'car_repair': 60,
+    'car_wash': 30,
+    'casino': 240,
+    'cemetery': 30,
+    'church': 60,
+    'city_hall': 45,
+    'clothing_store': 45,
+    'convenience_store': 15,
+    'courthouse': 60,
+    'dentist': 60,
+    'department_store': 90,
+    'doctor': 60,
+    'electrician': 45,
+    'electronics_store': 45,
+    'embassy': 60,
+    'fire_station': 30,
+    'florist': 15,
+    'funeral_home': 60,
+    'furniture_store': 60,
+    'gas_station': 10,
+    'gym': 90,
+    'hair_care': 60,
+    'hardware_store': 30,
+    'hindu_temple': 60,
+    'home_goods_store': 60,
+    'hospital': 90,
+    'insurance_agency': 45,
+    'jewelry_store': 30,
+    'laundry': 45,
+    'lawyer': 60,
+    'library': 90,
+    'light_rail_station': 30,
+    'liquor_store': 15,
+    'local_government_office': 60,
+    'locksmith': 30,
+    'lodging': 120,
+    'meal_delivery': 15,
+    'meal_takeaway': 15,
+    'mosque': 60,
+    'movie_rental': 15,
+    'movie_theater': 120,
+    'moving_company': 60,
+    'museum': 120,
+    'night_club': 180,
+    'painter': 45,
+    'park': 60,
+    'parking': 10,
+    'pet_store': 30,
+    'pharmacy': 15,
+    'physiotherapist': 60,
+    'plumber': 45,
+    'police': 60,
+    'post_office': 30,
+    'real_estate_agency': 60,
+    'restaurant': 90,
+    'roofing_contractor': 45,
+    'rv_park': 180,
+    'school': 60,
+    'shoe_store': 30,
+    'shopping_mall': 180,
+    'spa': 90,
+    'stadium': 180,
+    'storage': 30,
+    'store': 45,
+    'subway_station': 30,
+    'supermarket': 45,
+    'synagogue': 60,
+    'taxi_stand': 10,
+    'train_station': 30,
+    'transit_station': 30,
+    'travel_agency': 45,
+    'veterinary_care': 60,
+    'zoo': 180
+}
+
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
   }
@@ -28,6 +122,12 @@ export class GooglemapsPlaceService {
       return current.score > prevBest.score ? current : prevBest;
     });
     return {place_id: bestPlace.place_id, score: bestPlace.score}
+  }
+  async getNextTime (type: string) {
+    const averageTime = await this.average_visit_times[type] || 0;
+    this.currentTime = this.currentTime + (averageTime * 60000)
+    const nextTime = new Date(this.currentTime).toLocaleTimeString('en-US', { hour12: false });
+    return nextTime;
   }
   async getPlaceDetails(placeId: string) {
     try {
@@ -90,10 +190,17 @@ export class GooglemapsPlaceService {
           );
   
           const bestPlace = await this.getBestPlace(review_scores);
-          return bestPlace;
+          const currentTime = new Date(this.currentTime).toLocaleTimeString('en-US', { hour12: false });
+          const nextTime = await this.getNextTime(type)
+          return {
+            bestPlace : bestPlace,
+            type: type,
+            avarageTime : this.average_visit_times[type],
+            fromTime : currentTime ,
+            nextTime : nextTime
+          };
 
         });
-  
         this.placeList = await Promise.all(placePromises);
         return this.placeList;
       } else {

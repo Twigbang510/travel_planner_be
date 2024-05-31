@@ -203,28 +203,33 @@ export class GooglemapsPlaceService {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = this.currentDate;
 
-      const placePromises = types.map(async (type) => {
-        if (localCurrentDate < totalDates) {
+      while (localCurrentDate <= totalDates) {
+        const typePromises = types.map(async (type) => {
+          if (localCurrentDate > totalDates) return null;
+
           const placeIds = await this.fetchNearbyPlaces(lat, lng, type, radius);
           const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
-
           const bestPlace = await this.getBestPlace(reviewScores);
+
           const { fromTime, nextTime, nextDate } = this.getNextTime(localCurrentTime, localCurrentDate, type);
           localCurrentTime = nextTime;
           localCurrentDate = nextDate;
 
-          return {
-            bestPlace,
-            type,
-            indexOfDate: nextDate,
-            averageTime: this.averageVisitTimes[type],
-            fromTime: this.formatTime(fromTime),
-            nextTime: this.formatTime(nextTime),
-          };
-        }
-      });
+          return bestPlace
+            ? {
+                bestPlace,
+                type,
+                indexOfDate: nextDate,
+                averageTime: this.averageVisitTimes[type],
+                fromTime: this.formatTime(fromTime),
+                nextTime: this.formatTime(nextTime),
+              }
+            : null;
+        });
 
-      this.placeList = (await Promise.all(placePromises)).filter(result => result !== undefined);
+        const results = await Promise.all(typePromises);
+        this.placeList.push(...results.filter(result => result !== null));
+      }
       return this.placeList;
     } catch (error) {
       console.error(error.response?.data || error.message);

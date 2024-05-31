@@ -3,6 +3,7 @@ import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
+import { sleep } from 'src/utils/helpers';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -160,17 +161,25 @@ export class GooglemapsPlaceService {
     const sentimentPromises = filteredReviews.map(reviews => this.analyzeSentiment(reviews));
     return Promise.all(sentimentPromises);
   }
-
-  private async fetchNearbyPlaces(lat: number, lng: number, type: string, radius: number) {
-    const response = await this.googleMapsClient.placesNearby({
-      params: {
+  private async fetchNearbyPlaces(lat: number, lng: number, type: string, radius: number, nextPageToken: string): Promise<{ nextPage: string, placeId: string[] }> {
+    try {
+      const params: any = {
         location: { lat, lng },
         radius,
         type,
         key: this.configService.googleMapsKey,
-      },
-    });
-    return response.data.results.map(place => place.place_id);
+      };
+      if (nextPageToken) {
+        params.pagetoken = nextPageToken;
+      }
+      await sleep(1000);
+      const response = await this.googleMapsClient.placesNearby({ params });
+
+      return { nextPage: response.data.next_page_token ? response.data.next_page_token : '', placeId: response.data.results.map(place => place.place_id) };
+    } catch (err) {
+      console.error(err.message);
+      throw new HttpException('Error fetching nearby places', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async getPlaceDetails(placeId: string) {
@@ -198,39 +207,39 @@ export class GooglemapsPlaceService {
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
     const totalDates = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
-
+    let placeList = []
     try {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = this.currentDate;
-
+      let nextPageToken = {};
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
-
-          const placeIds = await this.fetchNearbyPlaces(lat, lng, type, radius);
-          const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+          const { nextPage, placeId } = await this.fetchNearbyPlaces(lat, lng, type, radius, nextPageToken[type]);
+          nextPageToken[type] = nextPage;
+          const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeId);
           const bestPlace = await this.getBestPlace(reviewScores);
-
           const { fromTime, nextTime, nextDate } = this.getNextTime(localCurrentTime, localCurrentDate, type);
           localCurrentTime = nextTime;
           localCurrentDate = nextDate;
 
+
           return bestPlace
             ? {
-                bestPlace,
-                type,
-                indexOfDate: nextDate,
-                averageTime: this.averageVisitTimes[type],
-                fromTime: this.formatTime(fromTime),
-                nextTime: this.formatTime(nextTime),
-              }
+              bestPlace,
+              type,
+              indexOfDate: nextDate,
+              averageTime: this.averageVisitTimes[type],
+              fromTime: this.formatTime(fromTime),
+              nextTime: this.formatTime(nextTime),
+            }
             : null;
         });
 
         const results = await Promise.all(typePromises);
-        this.placeList.push(...results.filter(result => result !== null));
+        placeList.push(...results.filter(result => result !== null));
       }
-      return this.placeList;
+      return placeList;
     } catch (error) {
       console.error(error.response?.data || error.message);
       throw new HttpException('Error fetching nearby places', HttpStatus.INTERNAL_SERVER_ERROR);

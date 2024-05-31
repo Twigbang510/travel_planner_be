@@ -2,13 +2,11 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
-import { PredictionServiceClient } from '@google-cloud/aiplatform';
 import { SentimentResult } from './interface/sentiment-result.interface';
 
 @Injectable()
 export class GooglemapsPlaceService {
   private googleMapsClient: Client;
-  private aiPlatformClient: PredictionServiceClient;
   private language = require('@google-cloud/language');
   private client = new this.language.LanguageServiceClient();
   private currentDate = 1;
@@ -17,7 +15,7 @@ export class GooglemapsPlaceService {
   private placeList = [];
   private currentTypeIndex: number = 0;
 
-  private average_visit_times = {
+  private readonly average_visit_times = {
     'accounting': 30,
     'airport': 120,
     'amusement_park': 240,
@@ -115,19 +113,14 @@ export class GooglemapsPlaceService {
     this.googleMapsClient = new Client({});
   }
 
-  async getBestPlace(results: SentimentResult[]): Promise<{ place_id: string; score: number; }> {
-    if (!results.length ) return null;
-
-    const bestPlace = results.reduce((prevBest, current) => {
-      return current.score > prevBest.score ? current : prevBest;
-    });
-    return {place_id: bestPlace.place_id, score: bestPlace.score}
+  private async getBestPlace(results: SentimentResult[]): Promise<{ place_id: string; score: number } | null> {
+    if (!results.length) return null;
+    return results.reduce((best, current) => (current.score > best.score ? current : best));
   }
-  async getNextTime (type: string) {
-    const averageTime = await this.average_visit_times[type] || 0;
-    this.currentTime = this.currentTime + (averageTime * 60000)
-    const nextTime = new Date(this.currentTime).toLocaleTimeString('en-US', { hour12: false });
-    return nextTime;
+  private async getNextTime(type: string): Promise<string> {
+    const averageTime = this.average_visit_times[type] || 0;
+    this.currentTime += averageTime * 60000;
+    return new Date(this.currentTime).toLocaleTimeString('en-US', { hour12: false });
   }
   async getPlaceDetails(placeId: string) {
     try {
@@ -147,7 +140,6 @@ export class GooglemapsPlaceService {
           ],
         },
       });
-      console.log(response.data.result);
       return response.data.result;
     } catch (error) {
       console.log(error.message);
@@ -157,7 +149,21 @@ export class GooglemapsPlaceService {
       );
     }
   }
-
+  private async getPlaceReviews(placeId: string) {
+    const { data } = await this.googleMapsClient.placeDetails({
+      params: {
+        place_id: placeId,
+        key: this.configService.googleMapsKey,
+      },
+    });
+    const reviews = data.result.reviews || [];
+    return reviews.length ? { place_id: placeId, reviews } : null;
+  }
+  private async analyzeSentiment(reviews: { place_id: string; reviews: { text: string }[] }): Promise<SentimentResult> {
+    const text = reviews.reviews.map(review => review.text).join('\n');
+    const [result] = await this.client.analyzeSentiment({ document: { content: text, type: 'PLAIN_TEXT' } });
+    return { place_id: reviews.place_id, score: result.documentSentiment.score };
+  }
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
@@ -215,46 +221,4 @@ export class GooglemapsPlaceService {
       );
     }
   }
-  
-
-  async getPlaceReviews(placeId: string) {
-    try {
-      const response = await this.googleMapsClient.placeDetails({
-        params: {
-          place_id: placeId,
-          key: this.configService.googleMapsKey,
-        },
-      });
-      const reviews = response.data.result.reviews || [];
-      return reviews.length ? { place_id: placeId, reviews } : null;
-    } catch (error) {
-      console.error(error.response?.data || error.message);
-      throw new HttpException(
-        'Error fetching place details',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  async analyzeSentiment(reviews: { place_id: string, reviews: { text: string; }[] }): Promise<SentimentResult> {
-    const text = reviews.reviews.map((review) => review.text).join('\n');
-    try {
-      const document = {
-        content: text,
-        type: 'PLAIN_TEXT',
-      };
-      const [result] = await this.client.analyzeSentiment({
-        document: document,
-      });
-      const sentiment = result.documentSentiment;
-      return { place_id: reviews.place_id, score: sentiment.score };
-    } catch (error) {
-      console.error(error);
-      throw new HttpException(
-        'Error analyzing sentiment',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
 }

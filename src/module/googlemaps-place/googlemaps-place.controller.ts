@@ -18,5 +18,4 @@ export class GooglemapsPlaceController {
   getNearbyPlaces(@Body() nearbySearchDto: NearbySearchDto): Promise<any> {
     return this.googlemapsPlaceService.getNearbyPlaces(nearbySearchDto);
   }
-
 }

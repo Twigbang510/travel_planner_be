@@ -13,8 +13,6 @@ export class GooglemapsPlaceService {
   private currentDate = 1;
   private currentTime = new Date().setHours(6, 0, 0, 0);
   private endTime = new Date().setHours(20, 0, 0, 0);
-  private placeList = [];
-  private currentTypeIndex: number = 0;
 
   private readonly averageVisitTimes = {
     accounting: 30,
@@ -114,10 +112,22 @@ export class GooglemapsPlaceService {
     this.googleMapsClient = new Client({});
   }
 
+  /**
+   * Format time to 'HH:mm:ss' string.
+   * @param date - The date in milliseconds.
+   * @returns Formatted time string.
+   */
   private formatTime(date: number): string {
     return new Date(date).toLocaleTimeString('en-US', { hour12: false });
   }
 
+  /**
+   * Calculate the next time and date based on the current time and average visit time for a place type.
+   * @param currentTime - The current time in milliseconds.
+   * @param localCurrentDate - The current date as a number.
+   * @param type - The place type.
+   * @returns The next time and date.
+   */
   private getNextTime(
     currentTime: number,
     localCurrentDate: number,
@@ -127,6 +137,7 @@ export class GooglemapsPlaceService {
     let fromTime = currentTime;
     let nextTime = currentTime + averageTime * 60000;
 
+    // If next time exceeds the end time, move to the next day and reset the time.
     if (nextTime > this.endTime) {
       localCurrentDate += 1;
       fromTime = new Date().setHours(6, 0, 0, 0);
@@ -136,6 +147,11 @@ export class GooglemapsPlaceService {
     return { fromTime, nextTime, nextDate: localCurrentDate };
   }
 
+  /**
+   * Get the place with the highest sentiment score from the results.
+   * @param results - Array of sentiment results.
+   * @returns The place with the highest score or null if no results.
+   */
   private async getBestPlace(
     results: SentimentResult[],
   ): Promise<{ place_id: string; score: number } | null> {
@@ -146,6 +162,11 @@ export class GooglemapsPlaceService {
       : null;
   }
 
+  /**
+   * Get reviews for a specific place.
+   * @param placeId - The place ID.
+   * @returns The place ID and its reviews or null if no reviews.
+   */
   private async getPlaceReviews(placeId: string) {
     const { data } = await this.googleMapsClient.placeDetails({
       params: {
@@ -159,6 +180,11 @@ export class GooglemapsPlaceService {
       : null;
   }
 
+  /**
+   * Analyze the sentiment of the reviews.
+   * @param reviews - The place reviews.
+   * @returns The sentiment result.
+   */
   private async analyzeSentiment(reviews: {
     place_id: string;
     reviews: { text: string }[];
@@ -173,6 +199,11 @@ export class GooglemapsPlaceService {
     };
   }
 
+  /**
+   * Fetch place reviews and analyze their sentiment.
+   * @param placeIds - Array of place IDs.
+   * @returns Array of sentiment results sorted by score.
+   */
   private async fetchPlaceReviewsAndAnalyzeSentiment(
     placeIds: string[],
   ): Promise<SentimentResult[]> {
@@ -182,11 +213,25 @@ export class GooglemapsPlaceService {
     const placeReviews = await Promise.all(placeReviewsPromises);
     const filteredReviews = placeReviews.filter((reviews) => reviews !== null);
 
-    const sentimentPromises = filteredReviews.map((reviews) =>
-      this.analyzeSentiment(reviews),
+    const scores = await Promise.all(
+      filteredReviews.map((reviews) => this.analyzeSentiment(reviews)),
     );
-    return Promise.all(sentimentPromises);
+    const filteredScores = scores.filter((result) => result.score >= 0);
+
+    // Sort scores in descending order
+    const sortedScores = filteredScores.sort((a, b) => b.score - a.score);
+    return sortedScores;
   }
+
+  /**
+   * Fetch nearby places based on location, type, and radius.
+   * @param lat - Latitude of the location.
+   * @param lng - Longitude of the location.
+   * @param type - The place type.
+   * @param radius - Search radius.
+   * @param nextPageToken - Token for the next page of results.
+   * @returns The next page token and array of place IDs.
+   */
   private async fetchNearbyPlaces(
     lat: number,
     lng: number,
@@ -204,13 +249,11 @@ export class GooglemapsPlaceService {
       if (nextPageToken) {
         params.pagetoken = nextPageToken;
       }
-      await sleep(1000);
+      await sleep(1000); // Sleep to avoid exceeding API rate limits
       const response = await this.googleMapsClient.placesNearby({ params });
 
       return {
-        nextPage: response.data.next_page_token
-          ? response.data.next_page_token
-          : '',
+        nextPage: response.data.next_page_token || '',
         placeId: response.data.results.map((place) => place.place_id),
       };
     } catch (err) {
@@ -222,6 +265,11 @@ export class GooglemapsPlaceService {
     }
   }
 
+  /**
+   * Get details for a specific place.
+   * @param placeId - The place ID.
+   * @returns The place details.
+   */
   async getPlaceDetails(placeId: string) {
     if (!placeId) {
       throw new HttpException('Place ID is required', HttpStatus.BAD_REQUEST);
@@ -251,31 +299,44 @@ export class GooglemapsPlaceService {
     }
   }
 
+  /**
+   * Get nearby places and plan the visit itinerary based on sentiment analysis.
+   * @param nearbySearchDto - The DTO containing search parameters.
+   * @returns The planned place visit itinerary.
+   */
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
     const totalDates =
       (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
-    let placeList = [];
+    const placeList = [];
+    const draftPlaceList: { [key: string]: any[] } = {};
+
     try {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = this.currentDate;
-      let nextPageToken = {};
+      const nextPageToken: { [key: string]: string } = {};
+
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
-          const { nextPage, placeId } = await this.fetchNearbyPlaces(
-            lat,
-            lng,
-            type,
-            radius,
-            nextPageToken[type],
-          );
-          nextPageToken[type] = nextPage;
-          const reviewScores =
-            await this.fetchPlaceReviewsAndAnalyzeSentiment(placeId);
-          const bestPlace = await this.getBestPlace(reviewScores);
+
+          if (!draftPlaceList[type]) {
+            const { nextPage, placeId } = await this.fetchNearbyPlaces(
+              lat,
+              lng,
+              type,
+              radius,
+              nextPageToken[type],
+            );
+            nextPageToken[type] = nextPage;
+            const reviewScores =
+              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeId);
+            draftPlaceList[type] = reviewScores;
+          }
+
+          const bestPlace = draftPlaceList[type]?.shift();
           const { fromTime, nextTime, nextDate } = this.getNextTime(
             localCurrentTime,
             localCurrentDate,
@@ -283,6 +344,8 @@ export class GooglemapsPlaceService {
           );
           localCurrentTime = nextTime;
           localCurrentDate = nextDate;
+
+          if (localCurrentDate > totalDates) return null;
 
           return bestPlace
             ? {

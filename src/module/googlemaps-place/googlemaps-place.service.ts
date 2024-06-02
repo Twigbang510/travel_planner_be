@@ -1,5 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Client } from '@googlemaps/google-maps-services-js';
+import { Client, TravelMode } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
@@ -300,6 +300,38 @@ export class GooglemapsPlaceService {
   }
 
   /**
+   * Get details for a specific place.
+   * @param originPlaceId - The previous place ID.
+   * @param destinationPlaceId - The destination place ID.
+   * @returns time in milliseconds from the previous place to the destination place.
+   */
+  private async calculateTravelTime(
+    originPlaceId: string,
+    destinationPlaceId: string,
+  ): Promise<number> {
+    try {
+      const response = await this.googleMapsClient.distancematrix({
+        params: {
+          origins: [`place_id:${originPlaceId}`],
+          destinations: [`place_id:${destinationPlaceId}`],
+          key: this.configService.googleMapsKey,
+          mode: TravelMode.walking,
+        },
+      });
+
+      const travelTimeInSeconds =
+        response.data.rows[0].elements[0].duration.value;
+      return travelTimeInSeconds;
+    } catch (err) {
+      console.error(err.message);
+      throw new HttpException(
+        'Error calculating travel time',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Get nearby places and plan the visit itinerary based on sentiment analysis.
    * @param nearbySearchDto - The DTO containing search parameters.
    * @returns The planned place visit itinerary.
@@ -317,11 +349,13 @@ export class GooglemapsPlaceService {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = this.currentDate;
       const nextPageToken: { [key: string]: string } = {};
+      let previousPlaceId: string | null = null;
+      let travelTime = 0;
 
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
-
+          if (travelTime) localCurrentTime += travelTime * 60000;
           if (!draftPlaceList[type]) {
             const { nextPage, placeId } = await this.fetchNearbyPlaces(
               lat,
@@ -344,9 +378,18 @@ export class GooglemapsPlaceService {
           );
           localCurrentTime = nextTime;
           localCurrentDate = nextDate;
-
           if (localCurrentDate > totalDates) return null;
 
+          if (previousPlaceId && bestPlace) {
+            travelTime =
+              (await this.calculateTravelTime(
+                previousPlaceId,
+                bestPlace.place_id,
+              )) / 60;
+          } else {
+            travelTime = 0;
+          }
+          previousPlaceId = bestPlace?.place_id || null;
           return bestPlace
             ? {
                 bestPlace,

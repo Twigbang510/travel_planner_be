@@ -249,7 +249,7 @@ export class GooglemapsPlaceService {
       if (nextPageToken) {
         params.pagetoken = nextPageToken;
       }
-      await sleep(1000); // Sleep to avoid exceeding API rate limits
+      await sleep(500); // Sleep to avoid exceeding API rate limits
       const response = await this.googleMapsClient.placesNearby({ params });
 
       return {
@@ -348,6 +348,7 @@ export class GooglemapsPlaceService {
     try {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = this.currentDate;
+      let previousDate = this.currentDate;
       const nextPageToken: { [key: string]: string } = {};
       let previousPlaceId: string | null = null;
       let travelTime = 0;
@@ -355,6 +356,10 @@ export class GooglemapsPlaceService {
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
+          if (localCurrentDate !== previousDate) {
+            travelTime = 0;
+            previousDate = localCurrentDate;
+          }
           if (travelTime) localCurrentTime += travelTime * 60000;
           if (!draftPlaceList[type]) {
             const { nextPage, placeId } = await this.fetchNearbyPlaces(

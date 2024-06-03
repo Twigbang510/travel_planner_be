@@ -13,7 +13,12 @@ export class GooglemapsPlaceService {
   private currentDate = 1;
   private currentTime = new Date().setHours(6, 0, 0, 0);
   private endTime = new Date().setHours(20, 0, 0, 0);
-
+  private DANANG_BOUNDING_BOX = {
+    north: 16.154564,
+    south: 15.975568,
+    east: 108.276413,
+    west: 107.985724,
+  };
   private readonly averageVisitTimes = {
     accounting: 30,
     airport: 120,
@@ -157,8 +162,8 @@ export class GooglemapsPlaceService {
   ): Promise<{ place_id: string; score: number } | null> {
     return results.length
       ? results.reduce((best, current) =>
-          current.score > best.score ? current : best,
-        )
+        current.score > best.score ? current : best,
+      )
       : null;
   }
 
@@ -251,10 +256,19 @@ export class GooglemapsPlaceService {
       }
       await sleep(500); // Sleep to avoid exceeding API rate limits
       const response = await this.googleMapsClient.placesNearby({ params });
-
+      const filteredPlaces = response.data.results.filter((place) => {
+        const placeLat = place.geometry.location.lat;
+        const placeLng = place.geometry.location.lng;
+        return (
+          placeLat <= this.DANANG_BOUNDING_BOX.north &&
+          placeLat >= this.DANANG_BOUNDING_BOX.south &&
+          placeLng <= this.DANANG_BOUNDING_BOX.east &&
+          placeLng >= this.DANANG_BOUNDING_BOX.west
+        );
+      });
       return {
         nextPage: response.data.next_page_token || '',
-        placeId: response.data.results.map((place) => place.place_id),
+        placeId: filteredPlaces.map((place) => place.place_id),
       };
     } catch (err) {
       console.error(err.message);
@@ -397,13 +411,13 @@ export class GooglemapsPlaceService {
           previousPlaceId = bestPlace?.place_id || null;
           return bestPlace
             ? {
-                bestPlace,
-                type,
-                indexOfDate: nextDate,
-                averageTime: this.averageVisitTimes[type],
-                fromTime: this.formatTime(fromTime),
-                nextTime: this.formatTime(nextTime),
-              }
+              bestPlace,
+              type,
+              indexOfDate: nextDate,
+              averageTime: this.averageVisitTimes[type],
+              fromTime: this.formatTime(fromTime),
+              nextTime: this.formatTime(nextTime),
+            }
             : null;
         });
 

@@ -357,19 +357,20 @@ export class GooglemapsPlaceService {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
-    const totalDates =
-      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    const totalDates = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
     const placeList = [];
     const draftPlaceList: { [key: string]: any[] } = {};
-
+  
     try {
       let localCurrentTime = this.currentTime;
-      let localCurrentDate = this.currentDate;
-      let previousDate = this.currentDate;
+      let localCurrentDate = 1;
+      let previousDate = 1;
       const nextPageToken: { [key: string]: string } = {};
       let previousPlaceId: string | null = null;
       let travelTime = 0;
       let firstTime = true;
+      const startPlace = 'ChIJEyolkscZQjERBn5yhkvL8B0';
+
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
@@ -378,69 +379,65 @@ export class GooglemapsPlaceService {
             firstTime = true;
             previousDate = localCurrentDate;
           }
-          firstTime = true;
-
           if (travelTime) localCurrentTime += travelTime * 60000;
+  
           if (!draftPlaceList[type]) {
-            const { nextPage, places } = await this.fetchNearbyPlaces(
-              lat,
-              lng,
-              type,
-              radius,
-              nextPageToken[type],
-            );
+            const { nextPage, places } = await this.fetchNearbyPlaces(lat, lng, type, radius, nextPageToken[type]);
             nextPageToken[type] = nextPage;
             const placeIds = places.map((place) => place.place_id);
-            const reviewScores =
-              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+            const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
             draftPlaceList[type] = reviewScores.map((score, index) => ({
               ...score,
               location: places[index].location,
             }));
           }
-          const bestPlace = draftPlaceList[type]?.shift();
-          const { fromTime, nextTime, nextDate } = this.getNextTime(
-            localCurrentTime,
-            localCurrentDate,
-            type,
-          );
-          localCurrentTime = nextTime;
-          localCurrentDate = nextDate;
-          if (localCurrentDate > totalDates) return null;
-
-          if (previousPlaceId && bestPlace) {
-            travelTime =
-              (await this.calculateTravelTime(
-                previousPlaceId,
-                bestPlace.place_id,
-              )) / 60;
-          } else {
-            travelTime = 0;
-          }
-          previousPlaceId = bestPlace?.place_id || null;
-          return bestPlace
-            ? {
-              bestPlace,
-              type,
-              indexOfDate: nextDate,
-              averageTime: this.averageVisitTimes[type],
-              fromTime: this.formatTime(fromTime),
-              nextTime: this.formatTime(nextTime),
+  
+          const bestPlace = await draftPlaceList[type].reduce(async (bestPromise, current) => {
+            const best = await bestPromise;
+            if (!best || !travelTime) return current;
+            const currentTravelTime = await this.calculateTravelTime(
+              firstTime ? startPlace : previousPlaceId,
+              current.place_id
+            );
+            return currentTravelTime < travelTime ? current : best;
+          }, Promise.resolve(null));
+  
+          if (bestPlace) {
+            draftPlaceList[type] = draftPlaceList[type].filter((place) => place.place_id !== bestPlace.place_id);
+            const { fromTime, nextTime, nextDate } = this.getNextTime(localCurrentTime, localCurrentDate, type);
+            localCurrentTime = nextTime;
+            localCurrentDate = nextDate;
+  
+            if (localCurrentDate <= totalDates) {
+              travelTime = previousPlaceId 
+                ? (await this.calculateTravelTime(previousPlaceId, bestPlace.place_id)) / 60 
+                : 0;
+              previousPlaceId = bestPlace.place_id;
+              firstTime = false;
             }
+            return bestPlace
+            ? {
+                bestPlace,
+                type,
+                indexOfDate: localCurrentDate,
+                averageTime: this.averageVisitTimes[type],
+                fromTime: this.formatTime(fromTime),
+                nextTime: this.formatTime(nextTime),
+              }
             : null;
+          }
         });
-
+  
         const results = await Promise.all(typePromises);
         placeList.push(...results.filter((result) => result !== null));
       }
+  
       return placeList;
     } catch (error) {
-      console.error(error.response?.data || error.message);
-      throw new HttpException(
-        'Error fetching nearby places',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error(error.message);
+      throw new HttpException('Error fetching places', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+  
 
 }

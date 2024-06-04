@@ -243,7 +243,7 @@ export class GooglemapsPlaceService {
     type: string,
     radius: number,
     nextPageToken: string,
-  ): Promise<{ nextPage: string; placeId: string[] }> {
+  ): Promise<{ nextPage: string; places: { place_id: string; location: { lat: number; lng: number } }[] }> {
     try {
       const params: any = {
         location: { lat, lng },
@@ -268,7 +268,10 @@ export class GooglemapsPlaceService {
       });
       return {
         nextPage: response.data.next_page_token || '',
-        placeId: filteredPlaces.map((place) => place.place_id),
+        places: filteredPlaces.map((place) => ({
+          place_id: place.place_id,
+          location: place.geometry.location,
+        })),
       };
     } catch (err) {
       console.error(err.message);
@@ -366,17 +369,20 @@ export class GooglemapsPlaceService {
       const nextPageToken: { [key: string]: string } = {};
       let previousPlaceId: string | null = null;
       let travelTime = 0;
-
+      let firstTime = true;
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
           if (localCurrentDate !== previousDate) {
             travelTime = 0;
+            firstTime = true;
             previousDate = localCurrentDate;
           }
+          firstTime = true;
+
           if (travelTime) localCurrentTime += travelTime * 60000;
           if (!draftPlaceList[type]) {
-            const { nextPage, placeId } = await this.fetchNearbyPlaces(
+            const { nextPage, places } = await this.fetchNearbyPlaces(
               lat,
               lng,
               type,
@@ -384,11 +390,14 @@ export class GooglemapsPlaceService {
               nextPageToken[type],
             );
             nextPageToken[type] = nextPage;
+            const placeIds = places.map((place) => place.place_id);
             const reviewScores =
-              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeId);
-            draftPlaceList[type] = reviewScores;
+              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+            draftPlaceList[type] = reviewScores.map((score, index) => ({
+              ...score,
+              location: places[index].location,
+            }));
           }
-
           const bestPlace = draftPlaceList[type]?.shift();
           const { fromTime, nextTime, nextDate } = this.getNextTime(
             localCurrentTime,
@@ -433,4 +442,5 @@ export class GooglemapsPlaceService {
       );
     }
   }
+
 }

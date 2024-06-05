@@ -13,6 +13,9 @@ export class NearbySearchDto {
   @IsNumber()
   lng: number;
 
+  @IsString()
+  placeId: string;
+
   @IsOptional()
   @IsNumber()
   radius?: number;

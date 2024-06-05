@@ -133,14 +133,26 @@ export class GooglemapsPlaceService {
    * @param type - The place type.
    * @returns The next time and date.
    */
-  private getNextTime(
+  private async getNextTime(
     currentTime: number,
     localCurrentDate: number,
     type: string,
-  ): { fromTime: number; nextTime: number; nextDate: number } {
+    totalDates: number,
+    previousPlaceId: string | null,
+    bestPlace: { place_id: string },
+    firstTime: boolean,
+  ): Promise<{
+    fromTime: number;
+    nextTime: number;
+    nextDate: number;
+    travelTime: number;
+    previousPlaceId: string | null;
+    firstTime: boolean;
+  }> {
     const averageTime = this.averageVisitTimes[type] || 0;
     let fromTime = currentTime;
     let nextTime = currentTime + averageTime * 60000;
+    let travelTime = 0;
 
     // If next time exceeds the end time, move to the next day and reset the time.
     if (nextTime > this.endTime) {
@@ -149,9 +161,27 @@ export class GooglemapsPlaceService {
       nextTime = fromTime + averageTime * 60000;
     }
 
-    return { fromTime, nextTime, nextDate: localCurrentDate };
-  }
+    // Calculate travel time and update previousPlaceId and firstTime if localCurrentDate is within totalDates
+    if (localCurrentDate <= totalDates) {
+      travelTime = previousPlaceId
+        ? (await this.calculateTravelTime(
+            previousPlaceId,
+            bestPlace.place_id,
+          )) / 60
+        : 0;
+      previousPlaceId = bestPlace.place_id;
+      firstTime = false;
+    }
 
+    return {
+      fromTime,
+      nextTime,
+      nextDate: localCurrentDate,
+      travelTime,
+      previousPlaceId,
+      firstTime,
+    };
+  }
   /**
    * Get the place with the highest sentiment score from the results.
    * @param results - Array of sentiment results.
@@ -335,15 +365,9 @@ export class GooglemapsPlaceService {
           origins: [`place_id:${originPlaceId}`],
           destinations: [`place_id:${destinationPlaceId}`],
           key: this.configService.googleMapsKey,
-          mode: TravelMode.walking,
+          mode: TravelMode.driving,
         },
       });
-      console.log(
-        'travel time ',
-        originPlaceId,
-        destinationPlaceId,
-        response.data.rows[0].elements[0].duration.value,
-      );
       const travelTimeInSeconds =
         response.data.rows[0].elements[0].duration.value;
       return travelTimeInSeconds;
@@ -362,14 +386,20 @@ export class GooglemapsPlaceService {
    * @returns The planned place visit itinerary.
    */
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
-    const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
+    const {
+      lat,
+      lng,
+      types,
+      date_range,
+      radius = 1500,
+      placeId: startPlaceId,
+    } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
     const totalDates =
       (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
     const placeList = [];
     const draftPlaceList: { [key: string]: any[] } = {};
-
     try {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = 1;
@@ -378,8 +408,7 @@ export class GooglemapsPlaceService {
       let previousPlaceId: string | null = null;
       let travelTime = 0;
       let firstTime = true;
-      const startPlace = 'ChIJEyolkscZQjERBn5yhkvL8B0';
-
+      let position = 0;
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
@@ -387,6 +416,7 @@ export class GooglemapsPlaceService {
             travelTime = 0;
             firstTime = true;
             previousDate = localCurrentDate;
+            position = 0;
           }
           if (travelTime) localCurrentTime += travelTime * 60000;
 
@@ -411,42 +441,44 @@ export class GooglemapsPlaceService {
           const bestPlace = await draftPlaceList[type].reduce(
             async (bestPromise, current) => {
               const best = await bestPromise;
-              console.log("Current0", current)
               const currentTravelTime = await this.calculateTravelTime(
-                firstTime ? startPlace : previousPlaceId,
+                firstTime ? startPlaceId : previousPlaceId,
                 current.place_id,
               );
               if (!best || currentTravelTime < best.travelTime) {
-                current.travelTime = currentTravelTime; 
+                current.travelTime = currentTravelTime;
                 return current;
               }
               return best;
             },
             Promise.resolve(null),
           );
-
           if (bestPlace) {
             draftPlaceList[type] = draftPlaceList[type].filter(
               (place) => place.place_id !== bestPlace.place_id,
             );
-            const { fromTime, nextTime, nextDate } = this.getNextTime(
+            const {
+              fromTime,
+              nextTime,
+              nextDate,
+              travelTime: newTravelTime,
+              previousPlaceId: newPreviousPlaceId,
+              firstTime: newFirstTime,
+            } = await this.getNextTime(
               localCurrentTime,
               localCurrentDate,
               type,
+              totalDates,
+              previousPlaceId,
+              bestPlace,
+              firstTime,
             );
             localCurrentTime = nextTime;
             localCurrentDate = nextDate;
-
-            if (localCurrentDate <= totalDates) {
-              travelTime = previousPlaceId
-                ? (await this.calculateTravelTime(
-                    previousPlaceId,
-                    bestPlace.place_id,
-                  )) / 60
-                : 0;
-              previousPlaceId = bestPlace.place_id;
-              firstTime = false;
-            }
+            travelTime = newTravelTime;
+            previousPlaceId = newPreviousPlaceId;
+            firstTime = newFirstTime;
+            position += 1;
             return bestPlace
               ? {
                   bestPlace,
@@ -455,6 +487,7 @@ export class GooglemapsPlaceService {
                   averageTime: this.averageVisitTimes[type],
                   fromTime: this.formatTime(fromTime),
                   nextTime: this.formatTime(nextTime),
+                  position: position,
                 }
               : null;
           }

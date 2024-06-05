@@ -162,8 +162,8 @@ export class GooglemapsPlaceService {
   ): Promise<{ place_id: string; score: number } | null> {
     return results.length
       ? results.reduce((best, current) =>
-        current.score > best.score ? current : best,
-      )
+          current.score > best.score ? current : best,
+        )
       : null;
   }
 
@@ -243,7 +243,10 @@ export class GooglemapsPlaceService {
     type: string,
     radius: number,
     nextPageToken: string,
-  ): Promise<{ nextPage: string; places: { place_id: string; location: { lat: number; lng: number } }[] }> {
+  ): Promise<{
+    nextPage: string;
+    places: { place_id: string; location: { lat: number; lng: number } }[];
+  }> {
     try {
       const params: any = {
         location: { lat, lng },
@@ -335,7 +338,12 @@ export class GooglemapsPlaceService {
           mode: TravelMode.walking,
         },
       });
-
+      console.log(
+        'travel time ',
+        originPlaceId,
+        destinationPlaceId,
+        response.data.rows[0].elements[0].duration.value,
+      );
       const travelTimeInSeconds =
         response.data.rows[0].elements[0].duration.value;
       return travelTimeInSeconds;
@@ -357,10 +365,11 @@ export class GooglemapsPlaceService {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
-    const totalDates = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    const totalDates =
+      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
     const placeList = [];
     const draftPlaceList: { [key: string]: any[] } = {};
-  
+
     try {
       let localCurrentTime = this.currentTime;
       let localCurrentDate = 1;
@@ -380,64 +389,88 @@ export class GooglemapsPlaceService {
             previousDate = localCurrentDate;
           }
           if (travelTime) localCurrentTime += travelTime * 60000;
-  
+
           if (!draftPlaceList[type]) {
-            const { nextPage, places } = await this.fetchNearbyPlaces(lat, lng, type, radius, nextPageToken[type]);
+            const { nextPage, places } = await this.fetchNearbyPlaces(
+              lat,
+              lng,
+              type,
+              radius,
+              nextPageToken[type],
+            );
             nextPageToken[type] = nextPage;
             const placeIds = places.map((place) => place.place_id);
-            const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+            const reviewScores =
+              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
             draftPlaceList[type] = reviewScores.map((score, index) => ({
               ...score,
               location: places[index].location,
             }));
           }
-  
-          const bestPlace = await draftPlaceList[type].reduce(async (bestPromise, current) => {
-            const best = await bestPromise;
-            if (!best || !travelTime) return current;
-            const currentTravelTime = await this.calculateTravelTime(
-              firstTime ? startPlace : previousPlaceId,
-              current.place_id
-            );
-            return currentTravelTime < travelTime ? current : best;
-          }, Promise.resolve(null));
-  
+
+          const bestPlace = await draftPlaceList[type].reduce(
+            async (bestPromise, current) => {
+              const best = await bestPromise;
+              console.log("Current0", current)
+              const currentTravelTime = await this.calculateTravelTime(
+                firstTime ? startPlace : previousPlaceId,
+                current.place_id,
+              );
+              if (!best || currentTravelTime < best.travelTime) {
+                current.travelTime = currentTravelTime; 
+                return current;
+              }
+              return best;
+            },
+            Promise.resolve(null),
+          );
+
           if (bestPlace) {
-            draftPlaceList[type] = draftPlaceList[type].filter((place) => place.place_id !== bestPlace.place_id);
-            const { fromTime, nextTime, nextDate } = this.getNextTime(localCurrentTime, localCurrentDate, type);
+            draftPlaceList[type] = draftPlaceList[type].filter(
+              (place) => place.place_id !== bestPlace.place_id,
+            );
+            const { fromTime, nextTime, nextDate } = this.getNextTime(
+              localCurrentTime,
+              localCurrentDate,
+              type,
+            );
             localCurrentTime = nextTime;
             localCurrentDate = nextDate;
-  
+
             if (localCurrentDate <= totalDates) {
-              travelTime = previousPlaceId 
-                ? (await this.calculateTravelTime(previousPlaceId, bestPlace.place_id)) / 60 
+              travelTime = previousPlaceId
+                ? (await this.calculateTravelTime(
+                    previousPlaceId,
+                    bestPlace.place_id,
+                  )) / 60
                 : 0;
               previousPlaceId = bestPlace.place_id;
               firstTime = false;
             }
             return bestPlace
-            ? {
-                bestPlace,
-                type,
-                indexOfDate: localCurrentDate,
-                averageTime: this.averageVisitTimes[type],
-                fromTime: this.formatTime(fromTime),
-                nextTime: this.formatTime(nextTime),
-              }
-            : null;
+              ? {
+                  bestPlace,
+                  type,
+                  indexOfDate: localCurrentDate,
+                  averageTime: this.averageVisitTimes[type],
+                  fromTime: this.formatTime(fromTime),
+                  nextTime: this.formatTime(nextTime),
+                }
+              : null;
           }
         });
-  
+
         const results = await Promise.all(typePromises);
         placeList.push(...results.filter((result) => result !== null));
       }
-  
+
       return placeList;
     } catch (error) {
       console.error(error.message);
-      throw new HttpException('Error fetching places', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Error fetching places',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
-  
-
 }

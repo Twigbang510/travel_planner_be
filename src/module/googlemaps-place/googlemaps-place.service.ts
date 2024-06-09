@@ -112,7 +112,15 @@ export class GooglemapsPlaceService {
     veterinary_care: 60,
     zoo: 180,
   };
-
+  private readonly placeTypes = {
+    outdoor: ['zoo', 'aquarium', 'cafe', 'bowling_alley'],
+    art: ['art_gallery', 'painter'],
+    park: ['amusement_park', 'park'],
+    shopping: ['convenience_store', 'shopping_mall'],
+    historical: ['church', 'hindu_temple', 'museum'],
+    nightlife: ['bar', 'night_club', 'casino'],
+    food: ['restaurant', 'cafe', 'bakery', 'food'],
+};
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
   }
@@ -224,7 +232,6 @@ export class GooglemapsPlaceService {
         (place) => place.place_id !== bestPlace.place_id,
       );
     }
-    console.log(bestPlace);
     return bestPlace;
   }
 
@@ -433,7 +440,7 @@ export class GooglemapsPlaceService {
     const draftPlaceList: { [key: string]: any[] } = {};
     try {
       let localCurrentTime = this.currentTime;
-      let localCurrentDate = 1;
+      let localCurrentDate = 0;
       let previousDate = 1;
       const nextPageToken: { [key: string]: string } = {};
       let previousPlaceId: string | null = null;
@@ -441,9 +448,19 @@ export class GooglemapsPlaceService {
       let firstTime = true;
       let position = 0;
       let currentDate = new Date(startDate);
-      while (localCurrentDate <= totalDates) {
-        const typePromises = types.map(async (type) => {
-          if (localCurrentDate > totalDates) return null;
+      const positions = {};
+      types.forEach(key => {
+        positions[key] = 0;
+      });
+      while (localCurrentDate < totalDates) {
+        const typePromises: Promise<any>[] = [];
+        if (localCurrentDate > totalDates) break; 
+        
+        for (const key of types) {
+          const array = this.placeTypes[key];
+          const pos = positions[key];
+          const type = array[pos];
+          positions[key] = (pos + 1) % array.length;
           if (localCurrentDate !== previousDate) {
             travelTime = 0;
             firstTime = true;
@@ -451,7 +468,6 @@ export class GooglemapsPlaceService {
             position = 0;
           }
           if (travelTime) localCurrentTime += travelTime * 60000;
-
           if (!draftPlaceList[type]) {
             const { nextPage, places } = await this.fetchNearbyPlaces(
               lat,
@@ -462,14 +478,12 @@ export class GooglemapsPlaceService {
             );
             nextPageToken[type] = nextPage;
             const placeIds = places.map((place) => place.place_id);
-            const reviewScores =
-              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+            const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
             draftPlaceList[type] = reviewScores.map((score, index) => ({
               ...score,
               location: places[index].location,
             }));
           }
-
           const bestPlace = await this.getBestPlace(
             draftPlaceList,
             type,
@@ -506,8 +520,9 @@ export class GooglemapsPlaceService {
             firstTime = newFirstTime;
             position += 1;
             currentDate = newCurrentDate;
-            return bestPlace
-              ? {
+            typePromises.push(
+              new Promise((resolve) => {
+                resolve({
                   bestPlace,
                   type,
                   indexOfDate: localCurrentDate,
@@ -516,13 +531,13 @@ export class GooglemapsPlaceService {
                   nextTime: this.formatTime(nextTime),
                   position: position,
                   currentDate: newCurrentDate,
-                }
-              : null;
+                });
+              })
+            );
           }
-        });
-
+        }
         const results = await Promise.all(typePromises);
-        placeList.push(...results.filter((result) => result !== null));
+        placeList.push(...results);
       }
 
       return placeList;

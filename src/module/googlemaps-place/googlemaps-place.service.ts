@@ -141,6 +141,7 @@ export class GooglemapsPlaceService {
     previousPlaceId: string | null,
     bestPlace: { place_id: string },
     firstTime: boolean,
+    currentDate: Date,
   ): Promise<{
     fromTime: number;
     nextTime: number;
@@ -148,6 +149,7 @@ export class GooglemapsPlaceService {
     travelTime: number;
     previousPlaceId: string | null;
     firstTime: boolean;
+    currentDate: Date;
   }> {
     const averageTime = this.averageVisitTimes[type] || 0;
     let fromTime = currentTime;
@@ -157,6 +159,8 @@ export class GooglemapsPlaceService {
     // If next time exceeds the end time, move to the next day and reset the time.
     if (nextTime > this.endTime) {
       localCurrentDate += 1;
+      currentDate = new Date(currentDate);
+      currentDate.setDate(currentDate.getDate() + 1);
       fromTime = new Date().setHours(6, 0, 0, 0);
       nextTime = fromTime + averageTime * 60000;
     }
@@ -180,6 +184,7 @@ export class GooglemapsPlaceService {
       travelTime,
       previousPlaceId,
       firstTime,
+      currentDate,
     };
   }
   /**
@@ -409,6 +414,7 @@ export class GooglemapsPlaceService {
       let travelTime = 0;
       let firstTime = true;
       let position = 0;
+      let currentDate = new Date(startDate);
       while (localCurrentDate <= totalDates) {
         const typePromises = types.map(async (type) => {
           if (localCurrentDate > totalDates) return null;
@@ -464,6 +470,7 @@ export class GooglemapsPlaceService {
               travelTime: newTravelTime,
               previousPlaceId: newPreviousPlaceId,
               firstTime: newFirstTime,
+              currentDate: newCurrentDate,
             } = await this.getNextTime(
               localCurrentTime,
               localCurrentDate,
@@ -472,6 +479,7 @@ export class GooglemapsPlaceService {
               previousPlaceId,
               bestPlace,
               firstTime,
+              currentDate,
             );
             localCurrentTime = nextTime;
             localCurrentDate = nextDate;
@@ -479,6 +487,7 @@ export class GooglemapsPlaceService {
             previousPlaceId = newPreviousPlaceId;
             firstTime = newFirstTime;
             position += 1;
+            currentDate = newCurrentDate;
             return bestPlace
               ? {
                   bestPlace,
@@ -488,6 +497,7 @@ export class GooglemapsPlaceService {
                   fromTime: this.formatTime(fromTime),
                   nextTime: this.formatTime(nextTime),
                   position: position,
+                  currentDate: newCurrentDate,
                 }
               : null;
           }

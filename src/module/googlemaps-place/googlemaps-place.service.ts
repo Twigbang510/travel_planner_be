@@ -189,17 +189,43 @@ export class GooglemapsPlaceService {
   }
   /**
    * Get the place with the highest sentiment score from the results.
-   * @param results - Array of sentiment results.
+   * @param draftPlaceList - List of locations of each type.
+   * @param type - The type of the location
+   * @param firstTime - Boolean data type, checks whether it has moved to a new date or not
+   * @param startPlaceId - ID of the starting location
+   * @param previousPlaceId - ID of the best location found previously
    * @returns The place with the highest score or null if no results.
    */
   private async getBestPlace(
-    results: SentimentResult[],
-  ): Promise<{ place_id: string; score: number } | null> {
-    return results.length
-      ? results.reduce((best, current) =>
-          current.score > best.score ? current : best,
-        )
-      : null;
+    draftPlaceList: { [key: string]: any[] },
+    type: string,
+    firstTime: boolean,
+    startPlaceId: string,
+    previousPlaceId: string | null,
+  ): Promise<any> {
+    const bestPlace = await draftPlaceList[type].reduce(
+      async (bestPromise, current) => {
+        const best = await bestPromise;
+        const currentTravelTime = await this.calculateTravelTime(
+          firstTime ? startPlaceId : previousPlaceId,
+          current.place_id,
+        );
+        if (!best || currentTravelTime < best.travelTime) {
+          current.travelTime = currentTravelTime;
+          return current;
+        }
+        return best;
+      },
+      Promise.resolve(null),
+    );
+
+    if (bestPlace) {
+      draftPlaceList[type] = draftPlaceList[type].filter(
+        (place) => place.place_id !== bestPlace.place_id,
+      );
+    }
+    console.log(bestPlace);
+    return bestPlace;
   }
 
   /**
@@ -444,20 +470,12 @@ export class GooglemapsPlaceService {
             }));
           }
 
-          const bestPlace = await draftPlaceList[type].reduce(
-            async (bestPromise, current) => {
-              const best = await bestPromise;
-              const currentTravelTime = await this.calculateTravelTime(
-                firstTime ? startPlaceId : previousPlaceId,
-                current.place_id,
-              );
-              if (!best || currentTravelTime < best.travelTime) {
-                current.travelTime = currentTravelTime;
-                return current;
-              }
-              return best;
-            },
-            Promise.resolve(null),
+          const bestPlace = await this.getBestPlace(
+            draftPlaceList,
+            type,
+            firstTime,
+            startPlaceId,
+            previousPlaceId,
           );
           if (bestPlace) {
             draftPlaceList[type] = draftPlaceList[type].filter(

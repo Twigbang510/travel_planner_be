@@ -423,7 +423,7 @@ export class GooglemapsPlaceService {
    * @param nearbySearchDto - The DTO containing search parameters.
    * @returns The planned place visit itinerary.
    */
-  async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
+  async getNearbyPlaces(nearbySearchDto: NearbySearchDto, userID: string) {
     const {
       lat,
       lng,
@@ -539,7 +539,10 @@ export class GooglemapsPlaceService {
         placeList.push(...results);
       }
 
-      return placeList;
+      return {
+        userID: userID,
+        placeList
+      };
     } catch (error) {
       console.error(error.message);
       throw new HttpException(

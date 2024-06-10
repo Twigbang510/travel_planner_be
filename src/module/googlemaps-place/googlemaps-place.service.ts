@@ -452,11 +452,10 @@ export class GooglemapsPlaceService {
       types.forEach(key => {
         positions[key] = 0;
       });
-      while (localCurrentDate < totalDates) {
+      while (localCurrentDate <= totalDates) {
         const typePromises: Promise<any>[] = [];
-        if (localCurrentDate > totalDates) break; 
-        
         for (const key of types) {
+          if (localCurrentDate > totalDates) break; 
           const array = this.placeTypes[key];
           const pos = positions[key];
           const type = array[pos];
@@ -521,7 +520,7 @@ export class GooglemapsPlaceService {
             position += 1;
             currentDate = newCurrentDate;
             typePromises.push(
-              new Promise((resolve) => {
+              new Promise((resolve,reject) => {
                 resolve({
                   bestPlace,
                   type,
@@ -531,7 +530,7 @@ export class GooglemapsPlaceService {
                   nextTime: this.formatTime(nextTime),
                   position: position,
                   currentDate: newCurrentDate,
-                });
+                })
               })
             );
           }

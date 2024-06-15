@@ -226,7 +226,7 @@ export class GooglemapsPlaceService {
       },
       Promise.resolve(null),
     );
-
+  
     if (bestPlace) {
       draftPlaceList[type] = draftPlaceList[type].filter(
         (place) => place.place_id !== bestPlace.place_id,
@@ -234,6 +234,7 @@ export class GooglemapsPlaceService {
     }
     return bestPlace;
   }
+  
 
   /**
    * Get reviews for a specific place.
@@ -313,8 +314,17 @@ export class GooglemapsPlaceService {
     nextPageToken: string,
   ): Promise<{
     nextPage: string;
-    places: { place_id: string; location: { lat: number; lng: number } }[];
-  }> {
+    places: {
+      place_id: string;
+      place_photos: any[];
+      place_icon: string;
+      place_name: string;
+      place_opening_hours: any;
+      place_price_level: number;
+      place_rating: number;
+      place_types: string[];
+      location: { lat: number; lng: number };
+    }[];  }> {
     try {
       const params: any = {
         location: { lat, lng },
@@ -327,22 +337,23 @@ export class GooglemapsPlaceService {
       }
       await sleep(500); // Sleep to avoid exceeding API rate limits
       const response = await this.googleMapsClient.placesNearby({ params });
-      const filteredPlaces = response.data.results.filter((place) => {
-        const placeLat = place.geometry.location.lat;
-        const placeLng = place.geometry.location.lng;
-        return (
-          placeLat <= this.DANANG_BOUNDING_BOX.north &&
-          placeLat >= this.DANANG_BOUNDING_BOX.south &&
-          placeLng <= this.DANANG_BOUNDING_BOX.east &&
-          placeLng >= this.DANANG_BOUNDING_BOX.west
-        );
-      });
+      const places = response.data.results.map((place) => ({
+        place_id: place.place_id,
+        place_photos: place.photos,
+        place_icon: place.icon,
+        place_name: place.name,
+        place_opening_hours: place.opening_hours || null,
+        place_price_level: place.price_level || null,
+        place_rating: place.rating || null,
+        place_types: place.types,
+        location: {
+          lat: place.geometry.location.lat,
+          lng: place.geometry.location.lng,
+        },
+      }));
       return {
         nextPage: response.data.next_page_token || '',
-        places: filteredPlaces.map((place) => ({
-          place_id: place.place_id,
-          location: place.geometry.location,
-        })),
+        places: places,
       };
     } catch (err) {
       console.error(err.message);
@@ -394,25 +405,27 @@ export class GooglemapsPlaceService {
    * @returns time in milliseconds from the previous place to the destination place.
    */
   private async calculateTravelTime(
-    originPlaceId: string,
+    startPlaceId: string,
     destinationPlaceId: string,
   ): Promise<number> {
     try {
-      const response = await this.googleMapsClient.distancematrix({
+      const { data } = await this.googleMapsClient.directions({
         params: {
-          origins: [`place_id:${originPlaceId}`],
-          destinations: [`place_id:${destinationPlaceId}`],
-          key: this.configService.googleMapsKey,
+          origin: `place_id:${startPlaceId}`,
+          destination: `place_id:${destinationPlaceId}`,
           mode: TravelMode.driving,
+          key: this.configService.googleMapsKey,
         },
       });
-      const travelTimeInSeconds =
-        response.data.rows[0].elements[0].duration.value;
-      return travelTimeInSeconds;
-    } catch (err) {
-      console.error(err.message);
+
+      if (data.routes.length) {
+        const travelTime = data.routes[0].legs[0].duration.value;
+        return travelTime;
+      }
+      return 0;
+    } catch (error) {
       throw new HttpException(
-        'Error calculating travel time',
+        'Failed to calculate travel time',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -423,7 +436,7 @@ export class GooglemapsPlaceService {
    * @param nearbySearchDto - The DTO containing search parameters.
    * @returns The planned place visit itinerary.
    */
-  async getNearbyPlaces(nearbySearchDto: NearbySearchDto, userID: string) {
+  async getPlan(nearbySearchDto: NearbySearchDto, userID: string) {
     const {
       lat,
       lng,
@@ -479,7 +492,7 @@ export class GooglemapsPlaceService {
             const placeIds = places.map((place) => place.place_id);
             const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
             draftPlaceList[type] = reviewScores.map((score, index) => ({
-              ...score,
+              ...places[index],
               location: places[index].location,
             }));
           }
@@ -491,9 +504,6 @@ export class GooglemapsPlaceService {
             previousPlaceId,
           );
           if (bestPlace) {
-            draftPlaceList[type] = draftPlaceList[type].filter(
-              (place) => place.place_id !== bestPlace.place_id,
-            );
             const {
               fromTime,
               nextTime,

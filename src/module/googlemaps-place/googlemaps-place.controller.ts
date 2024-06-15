@@ -17,8 +17,8 @@ export class GooglemapsPlaceController {
     return this.googlemapsPlaceService.getPlaceDetails(getPlaceIdDto.placeId);
   }
 
-  @Post('nearby')
-  getNearbyPlaces(@Body() nearbySearchDto: NearbySearchDto,  @UserData() user: any ): Promise<any> {
-    return this.googlemapsPlaceService.getNearbyPlaces(nearbySearchDto, user.id);
+  @Post('getplan')
+  getPlan(@Body() nearbySearchDto: NearbySearchDto,  @UserData() user: any ): Promise<any> {
+    return this.googlemapsPlaceService.getPlan(nearbySearchDto, user.id);
   }
 }

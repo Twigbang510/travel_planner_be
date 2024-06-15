@@ -120,7 +120,7 @@ export class GooglemapsPlaceService {
     historical: ['church', 'hindu_temple', 'museum'],
     nightlife: ['bar', 'night_club', 'casino'],
     food: ['restaurant', 'cafe', 'bakery', 'food'],
-};
+  };
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
   }
@@ -177,9 +177,9 @@ export class GooglemapsPlaceService {
     if (localCurrentDate <= totalDates) {
       travelTime = previousPlaceId
         ? (await this.calculateTravelTime(
-            previousPlaceId,
-            bestPlace.place_id,
-          )) / 60
+          previousPlaceId,
+          bestPlace.place_id,
+        )) / 60
         : 0;
       previousPlaceId = bestPlace.place_id;
       firstTime = false;
@@ -226,7 +226,7 @@ export class GooglemapsPlaceService {
       },
       Promise.resolve(null),
     );
-  
+
     if (bestPlace) {
       draftPlaceList[type] = draftPlaceList[type].filter(
         (place) => place.place_id !== bestPlace.place_id,
@@ -234,7 +234,7 @@ export class GooglemapsPlaceService {
     }
     return bestPlace;
   }
-  
+
 
   /**
    * Get reviews for a specific place.
@@ -316,15 +316,18 @@ export class GooglemapsPlaceService {
     nextPage: string;
     places: {
       place_id: string;
-      place_photos: any[];
-      place_icon: string;
-      place_name: string;
-      place_opening_hours: any;
-      place_price_level: number;
-      place_rating: number;
-      place_types: string[];
+      place_details: {
+        place_photos: any[];
+        place_icon: string;
+        place_name: string;
+        place_opening_hours: any;
+        place_price_level: number;
+        place_rating: number;
+        place_types: string[];
+      };
       location: { lat: number; lng: number };
-    }[];  }> {
+    }[];
+  }> {
     try {
       const params: any = {
         location: { lat, lng },
@@ -339,13 +342,15 @@ export class GooglemapsPlaceService {
       const response = await this.googleMapsClient.placesNearby({ params });
       const places = response.data.results.map((place) => ({
         place_id: place.place_id,
-        place_photos: place.photos,
-        place_icon: place.icon,
-        place_name: place.name,
-        place_opening_hours: place.opening_hours || null,
-        place_price_level: place.price_level || null,
-        place_rating: place.rating || null,
-        place_types: place.types,
+        place_details: {
+          place_photos: place.photos,
+          place_icon: place.icon,
+          place_name: place.name,
+          place_opening_hours: place.opening_hours || null,
+          place_price_level: place.price_level || null,
+          place_rating: place.rating || null,
+          place_types: place.types,
+        },
         location: {
           lat: place.geometry.location.lat,
           lng: place.geometry.location.lng,
@@ -437,18 +442,11 @@ export class GooglemapsPlaceService {
    * @returns The planned place visit itinerary.
    */
   async getPlan(nearbySearchDto: NearbySearchDto, userID: string) {
-    const {
-      lat,
-      lng,
-      types,
-      date_range,
-      radius = 1500,
-      placeId: startPlaceId,
-    } = nearbySearchDto;
+    const { lat, lng, types, date_range, radius = 1500, placeId: startPlaceId } = nearbySearchDto;
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
-    const totalDates =
-      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    const totalDates = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+
     const placeList = [];
     const draftPlaceList: { [key: string]: any[] } = {};
     try {
@@ -465,14 +463,17 @@ export class GooglemapsPlaceService {
       types.forEach(key => {
         positions[key] = 0;
       });
+
       while (localCurrentDate <= totalDates) {
-        const typePromises: Promise<any>[] = [];
-        for (const key of types) {
-          if (localCurrentDate > totalDates) break; 
+        const promises: Promise<any>[] = [];
+
+        // Batch fetch nearby places for all types
+        const fetchPromises = types.map(async key => {
           const array = this.placeTypes[key];
           const pos = positions[key];
           const type = array[pos];
           positions[key] = (pos + 1) % array.length;
+
           if (localCurrentDate !== previousDate) {
             travelTime = 0;
             firstTime = true;
@@ -481,28 +482,20 @@ export class GooglemapsPlaceService {
           }
           if (travelTime) localCurrentTime += travelTime * 60000;
           if (!draftPlaceList[type]) {
-            const { nextPage, places } = await this.fetchNearbyPlaces(
-              lat,
-              lng,
-              type,
-              radius,
-              nextPageToken[type],
-            );
+            const { nextPage, places } = await this.fetchNearbyPlaces(lat, lng, type, radius, nextPageToken[type]);
             nextPageToken[type] = nextPage;
-            const placeIds = places.map((place) => place.place_id);
+
+            const placeIds = places.map(place => place.place_id);
             const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+
             draftPlaceList[type] = reviewScores.map((score, index) => ({
               ...places[index],
               location: places[index].location,
             }));
           }
-          const bestPlace = await this.getBestPlace(
-            draftPlaceList,
-            type,
-            firstTime,
-            startPlaceId,
-            previousPlaceId,
-          );
+
+          const bestPlace = await this.getBestPlace(draftPlaceList, type, firstTime, startPlaceId, previousPlaceId);
+          console.log(bestPlace)
           if (bestPlace) {
             const {
               fromTime,
@@ -512,16 +505,8 @@ export class GooglemapsPlaceService {
               previousPlaceId: newPreviousPlaceId,
               firstTime: newFirstTime,
               currentDate: newCurrentDate,
-            } = await this.getNextTime(
-              localCurrentTime,
-              localCurrentDate,
-              type,
-              totalDates,
-              previousPlaceId,
-              bestPlace,
-              firstTime,
-              currentDate,
-            );
+            } = await this.getNextTime(localCurrentTime, localCurrentDate, type, totalDates, previousPlaceId, bestPlace, firstTime, currentDate);
+
             localCurrentTime = nextTime;
             localCurrentDate = nextDate;
             travelTime = newTravelTime;
@@ -529,36 +514,32 @@ export class GooglemapsPlaceService {
             firstTime = newFirstTime;
             position += 1;
             currentDate = newCurrentDate;
-            typePromises.push(
-              new Promise((resolve,reject) => {
-                resolve({
-                  bestPlace,
-                  type,
-                  indexOfDate: localCurrentDate,
-                  averageTime: this.averageVisitTimes[type],
-                  fromTime: this.formatTime(fromTime),
-                  nextTime: this.formatTime(nextTime),
-                  position: position,
-                  currentDate: newCurrentDate,
-                })
-              })
-            );
+
+            return {
+              bestPlace,
+              type,
+              indexOfDate: localCurrentDate,
+              averageTime: this.averageVisitTimes[type],
+              fromTime: this.formatTime(fromTime),
+              nextTime: this.formatTime(nextTime),
+              position: position,
+              currentDate: newCurrentDate,
+            };
           }
-        }
-        const results = await Promise.all(typePromises);
+        });
+
+        const results = await Promise.all(fetchPromises);
         placeList.push(...results);
       }
 
       return {
         userID: userID,
-        placeList
+        placeList,
       };
     } catch (error) {
       console.error(error.message);
-      throw new HttpException(
-        'Error fetching places',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Error fetching places', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+
 }

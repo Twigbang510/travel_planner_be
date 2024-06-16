@@ -205,33 +205,31 @@ export class GooglemapsPlaceService {
    * @returns The place with the highest score or null if no results.
    */
   private async getBestPlace(
-    draftPlaceList: { [key: string]: any[] },
+    draftPlaceList: any[],
     type: string,
     firstTime: boolean,
     startPlaceId: string,
     previousPlaceId: string | null,
   ): Promise<any> {
-    const bestPlace = await draftPlaceList[type].reduce(
-      async (bestPromise, current) => {
-        const best = await bestPromise;
-        const currentTravelTime = await this.calculateTravelTime(
-          firstTime ? startPlaceId : previousPlaceId,
-          current.place_id,
-        );
-        if (!best || currentTravelTime < best.travelTime) {
-          current.travelTime = currentTravelTime;
-          return current;
-        }
-        return best;
-      },
-      Promise.resolve(null),
-    );
+    let bestPlace = null;
+    let minTravelTime = Infinity;
+
+    for (const current of draftPlaceList) {
+      const currentTravelTime = await this.calculateTravelTime(
+        firstTime ? startPlaceId : previousPlaceId,
+        current.place_id,
+      );
+
+      if (!bestPlace || currentTravelTime < minTravelTime) {
+        minTravelTime = currentTravelTime;
+        bestPlace = current;
+      }
+    }
 
     if (bestPlace) {
-      draftPlaceList[type] = draftPlaceList[type].filter(
-        (place) => place.place_id !== bestPlace.place_id,
-      );
+      draftPlaceList.splice(draftPlaceList.indexOf(bestPlace), 1);
     }
+
     return bestPlace;
   }
 
@@ -454,7 +452,6 @@ export class GooglemapsPlaceService {
       });
 
       while (localCurrentDate <= totalDates) {
-        // Batch fetch nearby places for all types
         const fetchPromises = types.map(async (key) => {
           const array = this.placeTypes[key];
           const pos = positions[key];
@@ -484,19 +481,18 @@ export class GooglemapsPlaceService {
 
             draftPlaceList[type] = reviewScores.map((score, index) => ({
               ...places[index],
-              // location: places[index].location,
             }));
           }
 
           const bestPlace = await this.getBestPlace(
-            draftPlaceList,
+            draftPlaceList[type],
             type,
             firstTime,
             startPlaceId,
             previousPlaceId,
           );
+
           if (bestPlace) {
-            console.log('Best place', bestPlace);
             const {
               fromTime,
               nextTime,
@@ -524,23 +520,26 @@ export class GooglemapsPlaceService {
             position += 1;
             currentDate = newCurrentDate;
 
-            placeList.push({
-              bestPlace,
-              type,
-              indexOfDate: localCurrentDate,
-              averageTime: this.averageVisitTimes[type],
-              fromTime: this.formatTime(fromTime),
-              nextTime: this.formatTime(nextTime),
-              position: position,
-              currentDate: newCurrentDate,
-            });
+            if (nextDate <= totalDates) {
+              placeList.push({
+                bestPlace,
+                type,
+                indexOfDate: localCurrentDate,
+                averageTime: this.averageVisitTimes[type],
+                fromTime: this.formatTime(fromTime),
+                nextTime: this.formatTime(nextTime),
+                position: position,
+                currentDate: newCurrentDate,
+              });
+            } else {
+              return;
+            }
           }
         });
 
         await Promise.all(fetchPromises);
       }
 
-      // Fetch place details for each bestPlace in placeList
       const detailedPlaceList = await Promise.all(
         placeList.map(async (place) => {
           const details = await this.getPlaceDetails(place.bestPlace.place_id);

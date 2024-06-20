@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
-import { PlacesService } from './places.service';
+import { PlaceService } from './places.service';
 import { PlacesController } from './places.controller';
-import { GooglemapsPlaceModule } from '../googlemaps-place/googlemaps-place.module';
-import { GooglemapsPlaceService } from '../googlemaps-place/googlemaps-place.service';
 import { ConfigModule } from '../config/config.module';
+import { SequelizeModule } from '@nestjs/sequelize';
+import { Place } from './entities/place.entity';
 
 @Module({
-  imports: [GooglemapsPlaceModule, ConfigModule],
+  imports: [ConfigModule, SequelizeModule.forFeature([Place])],
   controllers: [PlacesController],
-  providers: [PlacesService, GooglemapsPlaceService],
+  providers: [PlaceService],
+  exports: [PlaceService],
 })
 export class PlacesModule {}

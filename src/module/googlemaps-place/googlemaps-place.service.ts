@@ -4,6 +4,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
 import { sleep } from 'src/utils/helpers';
+import { PlaceService } from '../places/places.service';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -121,7 +122,10 @@ export class GooglemapsPlaceService {
     nightlife: ['bar', 'night_club', 'casino'],
     food: ['restaurant', 'cafe', 'bakery', 'food'],
   };
-  constructor(private configService: AppConfigService) {
+  constructor(
+    private configService: AppConfigService,
+    private placeService: PlaceService,
+  ) {
     this.googleMapsClient = new Client({});
   }
 
@@ -404,6 +408,7 @@ export class GooglemapsPlaceService {
 
       if (data.routes.length) {
         const travelTime = data.routes[0].legs[0].duration.value;
+        console.log(travelTime);
         return travelTime;
       }
       return 0;
@@ -426,9 +431,13 @@ export class GooglemapsPlaceService {
       lng,
       types,
       date_range,
-      radius = 1500,
+      radius = 15000,
       placeId: startPlaceId,
     } = nearbySearchDto;
+    const startLocation = {
+      lat: lat,
+      lng: lng,
+    };
     const startDate = new Date(date_range[0]);
     const endDate = new Date(date_range[1]);
     const totalDates =
@@ -552,6 +561,23 @@ export class GooglemapsPlaceService {
           };
         }),
       );
+
+      // Save detailed places to the database
+      for (const place of detailedPlaceList) {
+        const placeData = {
+          placeId: place.bestPlace.place_id,
+          name: place.bestPlace.details.name,
+          address: place.bestPlace.details.formatted_address,
+          rating: place.bestPlace.details.rating,
+          userRatingsTotal: place.bestPlace.details.user_ratings_total,
+          website: place.bestPlace.details.website,
+          photoReference: place.bestPlace.details.photos
+            ? place.bestPlace.details.photos[0].photo_reference
+            : null,
+          geometry: place.bestPlace.details.geometry,
+        };
+        await this.placeService.createPlace(placeData);
+      }
 
       return {
         userID: userID,

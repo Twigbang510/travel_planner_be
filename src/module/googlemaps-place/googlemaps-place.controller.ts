@@ -18,7 +18,10 @@ export class GooglemapsPlaceController {
   }
 
   @Post('getplan')
-  getPlan(@Body() nearbySearchDto: NearbySearchDto,  @UserData() user: any ): Promise<any> {
+  getPlan(
+    @Body() nearbySearchDto: NearbySearchDto,
+    @UserData() user: any,
+  ): Promise<any> {
     return this.googlemapsPlaceService.getPlan(nearbySearchDto, user.id);
   }
 }

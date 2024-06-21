@@ -7,7 +7,8 @@ import { ConfigModule } from './module/config/config.module';
 import { AppConfigService } from './module/config/app-config.service';
 import { TokenModule } from './module/token/token.module';
 import { GooglemapsPlaceModule } from './module/googlemaps-place/googlemaps-place.module';
-import { PlacesModule } from './module/places/places.module';
+import { PlanModule } from './module/plan/plan.module';
+import { PlaceModule } from './module/place/place.module';
 
 @Module({
   imports: [
@@ -33,7 +34,9 @@ import { PlacesModule } from './module/places/places.module';
 
     GooglemapsPlaceModule,
 
-    PlacesModule,
+    PlaceModule,
+
+    PlanModule,
   ],
 })
 export class AppModule {}

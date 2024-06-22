@@ -12,6 +12,7 @@ import {
 import { PlanService } from './plan.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { Plan } from './entities/plan.entity';
 
 @Controller('plan')
 export class PlanController {
@@ -22,7 +23,10 @@ export class PlanController {
   async create(@Body() createPlanDto: CreatePlanDto) {
     return this.planService.create(createPlanDto);
   }
-
+  @Get(':userId')
+  async getPlansByUserId(@Param('userId') userId: number): Promise<Plan[]> {
+    return this.planService.getPlansByUserId(userId);
+  }
   @Get()
   findAll() {
     return this.planService.findAll();

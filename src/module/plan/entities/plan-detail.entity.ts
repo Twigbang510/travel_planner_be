@@ -25,12 +25,6 @@ export class PlanPlaceDetail extends Model<PlanPlaceDetail> {
   })
   placeId: number;
 
-  @BelongsTo(() => Plan)
-  plan: Plan;
-
-  @BelongsTo(() => Place)
-  place: Place;
-
   @Column({
     type: DataType.INTEGER,
     allowNull: false,
@@ -44,13 +38,13 @@ export class PlanPlaceDetail extends Model<PlanPlaceDetail> {
   averageTime: number;
 
   @Column({
-    type: DataType.STRING,
+    type: DataType.TIME,
     allowNull: false,
   })
   fromTime: string;
 
   @Column({
-    type: DataType.STRING,
+    type: DataType.TIME,
     allowNull: false,
   })
   nextTime: string;

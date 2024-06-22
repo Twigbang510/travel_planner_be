@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreatePlanDto } from './dto/create-plan.dto';
-import { UpdatePlanDto } from './dto/update-plan.dto';
 import { InjectModel } from '@nestjs/sequelize';
 import { Plan } from './entities/plan.entity';
 import { Place } from '../place/entities/place.entity';
 import { PlanPlaceDetail } from './entities/plan-detail.entity';
+import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdatePlanDto } from './dto/update-plan.dto';
 
 @Injectable()
 export class PlanService {
@@ -13,6 +13,7 @@ export class PlanService {
     @InjectModel(Place) private readonly placeModel: typeof Place,
     @InjectModel(PlanPlaceDetail) private readonly planPlaceDetailModel: typeof PlanPlaceDetail,
   ) {}
+
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
     const { userId, startDate, endDate, places } = createPlanDto;
 
@@ -39,6 +40,21 @@ export class PlanService {
     }
 
     return plan;
+  }
+
+  async getPlansByUserId(userId: number): Promise<Plan[]> {
+    return this.planModel.findAll({
+      where: { userId },
+      include: [
+        {
+          model: Place,
+          through: {
+            attributes: [],
+          },
+          // include: [PlanPlaceDetail],
+        },
+      ],
+    });
   }
 
   findAll() {

@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  UsePipes,
+  ValidationPipe 
 } from '@nestjs/common';
 import { PlanService } from './plan.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
@@ -16,7 +18,8 @@ export class PlanController {
   constructor(private readonly planService: PlanService) {}
 
   @Post()
-  create(@Body() createPlanDto: CreatePlanDto) {
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async create(@Body() createPlanDto: CreatePlanDto) {
     return this.planService.create(createPlanDto);
   }
 

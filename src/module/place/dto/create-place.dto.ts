@@ -1,55 +1,74 @@
-import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl } from "class-validator";
+import { IsString, IsNumber, IsArray, ValidateNested, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CreatePlaceDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  formatted_address: string;
-
+class LocationDto {
   @IsNumber()
-  @IsNotEmpty()
   lat: number;
 
   @IsNumber()
-  @IsNotEmpty()
   lng: number;
+}
 
-  @IsNumber()
-  @IsNotEmpty()
-  viewport_northeast_lat: number;
+class ViewportDto {
+  @ValidateNested()
+  @Type(() => LocationDto)
+  northeast: LocationDto;
 
-  @IsNumber()
-  @IsNotEmpty()
-  viewport_northeast_lng: number;
+  @ValidateNested()
+  @Type(() => LocationDto)
+  southwest: LocationDto;
+}
 
-  @IsNumber()
-  @IsNotEmpty()
-  viewport_southwest_lat: number;
+class GeometryDto {
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location: LocationDto;
 
+  @ValidateNested()
+  @Type(() => ViewportDto)
+  viewport: ViewportDto;
+}
+
+class PhotoDto {
   @IsNumber()
-  @IsNotEmpty()
-  viewport_southwest_lng: number;
+  height: number;
+
+  @IsArray()
+  @IsString({ each: true })
+  html_attributions: string[];
 
   @IsString()
-  @IsNotEmpty()
-  photos: string;
+  photo_reference: string;
+
+  @IsNumber()
+  width: number;
+}
+
+export class CreatePlaceDto {
+  @IsString()
+  formatted_address: string;
+
+  @ValidateNested()
+  @Type(() => GeometryDto)
+  geometry: GeometryDto;
 
   @IsString()
-  @IsNotEmpty()
+  name: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhotoDto)
+  photos: PhotoDto[];
+
+  @IsString()
   place_id: string;
 
   @IsNumber()
-  @IsNotEmpty()
   rating: number;
 
-  @IsInt()
-  @IsOptional()
+  @IsNumber()
   user_ratings_total: number;
 
-  @IsUrl()
-  @IsOptional()
+  @IsString()
   website: string;
 }

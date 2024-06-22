@@ -1,63 +1,41 @@
-import {
-  Table,
-  Column,
-  Model,
-  DataType,
-  ForeignKey,
-  BelongsTo,
-} from 'sequelize-typescript';
+import { Column, Model, Table, ForeignKey, BelongsTo } from 'sequelize-typescript';
 import { Plan } from './plan.entity';
 import { Place } from '../../place/entities/place.entity';
 
 @Table
-export class PlanPlaceDetail extends Model<PlanPlaceDetail> {
+export class PlanPlaceDetail extends Model {
   @ForeignKey(() => Plan)
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
+  @Column
   planId: number;
 
   @ForeignKey(() => Place)
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
+  @Column
   placeId: number;
 
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
+  @Column
+  type: string;
+
+  @Column
   indexOfDate: number;
 
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
+  @Column
   averageTime: number;
 
-  @Column({
-    type: DataType.TIME,
-    allowNull: false,
-  })
+  @Column
   fromTime: string;
 
-  @Column({
-    type: DataType.TIME,
-    allowNull: false,
-  })
+  @Column
   nextTime: string;
 
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: false,
-  })
+  @Column
   position: number;
 
-  @Column({
-    type: DataType.DATE,
-    allowNull: false,
-  })
-  currentDate: Date;
+  @Column
+  currentDate: string;
+
+  @BelongsTo(() => Plan)
+  plan: Plan;
+
+  @BelongsTo(() => Place)
+  place: Place;
 }

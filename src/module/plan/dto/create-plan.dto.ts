@@ -1,78 +1,59 @@
-// create-plan.dto.ts
-import {
-  IsInt,
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsDate,
-  IsNumber,
-  ValidateNested,
-  ArrayNotEmpty,
-  IsArray,
-  IsUrl
-} from 'class-validator';
+import { IsNumber, IsString, IsArray, ValidateNested, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreatePlaceDto } from 'src/module/place/dto/create-place.dto';
+import { CreatePlaceDto } from '../../place/dto/create-place.dto';
 
-export class CreatePlaceDetailDto {
-  @IsInt()
-  @IsNotEmpty()
-  placeId: number;
+class PlaceDetailDto {
+  @IsString()
+  type: string;
 
-  @IsInt()
-  @IsNotEmpty()
+  @IsNumber()
   indexOfDate: number;
 
-  @IsInt()
-  @IsNotEmpty()
+  @IsNumber()
   averageTime: number;
 
   @IsString()
-  @IsNotEmpty()
   fromTime: string;
 
   @IsString()
-  @IsNotEmpty()
   nextTime: string;
 
-  @IsInt()
-  @IsNotEmpty()
+  @IsNumber()
   position: number;
 
-  @IsDate()
-  @Type(() => Date)
-  @IsNotEmpty()
-  currentDate: Date;
+  @IsDateString()
+  currentDate: string;
 }
 
-export class CreatePlanDto {
-  @IsInt()
-  @IsNotEmpty()
-  userId: number;
-
-  @IsDate()
-  @Type(() => Date)
-  @IsNotEmpty()
-  startDate: Date;
-
-  @IsDate()
-  @Type(() => Date)
-  @IsNotEmpty()
-  endDate: Date;
-
-  @IsArray()
-  @ArrayNotEmpty()
-  @ValidateNested({ each: true })
-  @Type(() => PlaceWithDetailsDto)
-  places: PlaceWithDetailsDto[];
-}
-
-export class PlaceWithDetailsDto {
+class PlaceWithDetailsDto {
   @ValidateNested()
   @Type(() => CreatePlaceDto)
   place: CreatePlaceDto;
 
   @ValidateNested()
-  @Type(() => CreatePlaceDetailDto)
-  placeDetails: CreatePlaceDetailDto;
+  @Type(() => PlaceDetailDto)
+  placeDetails: PlaceDetailDto;
+}
+
+export class CreatePlanDto {
+  @IsNumber()
+  userId: number;
+
+  @IsDateString()
+  startDate: string;
+
+  @IsDateString()
+  endDate: string;
+
+  @IsString()
+  startPlaceId: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  types: string[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PlaceWithDetailsDto)
+  places: PlaceWithDetailsDto[];
 }

@@ -1,12 +1,5 @@
-import {
-  Table,
-  Column,
-  Model,
-  DataType,
-  BelongsToMany,
-} from 'sequelize-typescript';
-import { PlanPlaceDetail } from 'src/module/plan/entities/plan-detail.entity';
-import { Plan } from 'src/module/plan/entities/plan.entity';
+import { Table, Column, Model, DataType, HasMany } from 'sequelize-typescript';
+import { PlanPlaceDetail } from '../../plan/entities/plan-detail.entity';
 
 @Table
 export class Place extends Model<Place> {
@@ -14,55 +7,45 @@ export class Place extends Model<Place> {
     type: DataType.STRING,
     allowNull: false,
   })
-  name: string;
+  formatted_address: string;
+
+  @Column({
+    type: DataType.JSON,
+    allowNull: false,
+  })
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+    viewport: {
+      northeast: {
+        lat: number;
+        lng: number;
+      };
+      southwest: {
+        lat: number;
+        lng: number;
+      };
+    };
+  };
 
   @Column({
     type: DataType.STRING,
     allowNull: false,
   })
-  formatted_address: string;
+  name: string;
 
   @Column({
-    type: DataType.FLOAT,
+    type: DataType.JSON,
     allowNull: false,
   })
-  lat: number;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  lng: number;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  viewport_northeast_lat: number;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  viewport_northeast_lng: number;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  viewport_southwest_lat: number;
-
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
-  })
-  viewport_southwest_lng: number;
-
-  @Column({
-    type: DataType.TEXT,
-    allowNull: true,
-  })
-  photos: string; // Store JSON string of photos
+  photos: Array<{
+    height: number;
+    html_attributions: string[];
+    photo_reference: string;
+    width: number;
+  }>;
 
   @Column({
     type: DataType.STRING,
@@ -84,10 +67,10 @@ export class Place extends Model<Place> {
 
   @Column({
     type: DataType.STRING,
-    allowNull: true,
+    allowNull: false,
   })
   website: string;
 
-  @BelongsToMany(() => Plan, () => PlanPlaceDetail)
-  plans: Plan[];
+  @HasMany(() => PlanPlaceDetail)
+  planPlaceDetails: PlanPlaceDetail[];
 }

@@ -27,16 +27,6 @@ export class PlanController {
   async getPlansByUserId(@Param('userId') userId: number): Promise<Plan[]> {
     return this.planService.getPlansByUserId(userId);
   }
-  @Get()
-  findAll() {
-    return this.planService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.planService.findOne(+id);
-  }
-
   @Patch(':id')
   update(@Param('id') id: string, @Body() updatePlanDto: UpdatePlanDto) {
     return this.planService.update(+id, updatePlanDto);

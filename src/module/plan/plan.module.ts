@@ -9,7 +9,11 @@ import { ConfigModule } from '../config/config.module';
 import { Place } from '../place/entities/place.entity';
 
 @Module({
-  imports: [PlaceModule, ConfigModule, SequelizeModule.forFeature([Plan,Place, PlanPlaceDetail])],
+  imports: [
+    PlaceModule,
+    ConfigModule,
+    SequelizeModule.forFeature([Plan, Place, PlanPlaceDetail]),
+  ],
   controllers: [PlanController],
   providers: [PlanService],
 })

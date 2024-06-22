@@ -1,4 +1,10 @@
-import { Column, Model, Table, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import {
+  Column,
+  Model,
+  Table,
+  ForeignKey,
+  BelongsTo,
+} from 'sequelize-typescript';
 import { Plan } from './plan.entity';
 import { Place } from '../../place/entities/place.entity';
 

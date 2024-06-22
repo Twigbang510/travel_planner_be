@@ -7,7 +7,7 @@ import {
   Param,
   Delete,
   UsePipes,
-  ValidationPipe 
+  ValidationPipe,
 } from '@nestjs/common';
 import { PlanService } from './plan.service';
 import { CreatePlanDto } from './dto/create-plan.dto';

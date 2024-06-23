@@ -13,15 +13,16 @@ export class PlanService {
   constructor(
     @InjectModel(Plan) private readonly planModel: typeof Plan,
     @InjectModel(Place) private readonly placeModel: typeof Place,
-    @InjectModel(PlanPlaceDetail) private readonly planPlaceDetailModel: typeof PlanPlaceDetail,
+    @InjectModel(PlanPlaceDetail)
+    private readonly planPlaceDetailModel: typeof PlanPlaceDetail,
     @InjectModel(User) private readonly userModel: typeof User,
     private readonly googleSheetsService: GoogleSheetsService,
-
   ) {}
 
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
     try {
-      const { userId, startDate, endDate, startPlaceId, types, places } = createPlanDto;
+      const { userId, startDate, endDate, startPlaceId, types, places } =
+        createPlanDto;
 
       const plan = await this.planModel.create({
         userId,
@@ -60,10 +61,12 @@ export class PlanService {
     try {
       const plans = await this.planModel.findAll({
         where: { userId: userId },
-        include: [{
-          model: PlanPlaceDetail,
-          include: [Place]
-        }],
+        include: [
+          {
+            model: PlanPlaceDetail,
+            include: [Place],
+          },
+        ],
       });
 
       if (!plans || plans.length === 0) {
@@ -73,7 +76,9 @@ export class PlanService {
       return plans;
     } catch (error) {
       console.error('Error when fetching Plans by userId', error);
-      throw new NotFoundException('Could not fetch Plans. Please try again later.');
+      throw new NotFoundException(
+        'Could not fetch Plans. Please try again later.',
+      );
     }
   }
 
@@ -95,7 +100,9 @@ export class PlanService {
       return plan;
     } catch (error) {
       console.error('Error when fetching Plan by id', error);
-      throw new NotFoundException('Could not fetch Plan. Please try again later.');
+      throw new NotFoundException(
+        'Could not fetch Plan. Please try again later.',
+      );
     }
   }
   public async exportPlan(planId: number): Promise<void> {
@@ -112,15 +119,22 @@ export class PlanService {
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
-      
-      const sheetDetail = this.googleSheetsService.createSpreadsheet("Plan",plan)
-      if ( sheetDetail ) return sheetDetail
+
+      const sheetDetail = this.googleSheetsService.createSpreadsheet(
+        'Plan',
+        plan,
+      );
+      if (sheetDetail) return sheetDetail;
     } catch (error) {
-      console.error('Error exporting plans by planId and email to Google Sheets:', error);
-      throw new Error('Could not export plans to Google Sheets. Please try again later.');
+      console.error(
+        'Error exporting plans by planId and email to Google Sheets:',
+        error,
+      );
+      throw new Error(
+        'Could not export plans to Google Sheets. Please try again later.',
+      );
     }
   }
-
 
   async update(id: number, updatePlanDto: UpdatePlanDto): Promise<Plan> {
     try {
@@ -129,7 +143,8 @@ export class PlanService {
         throw new NotFoundException('Plan not found');
       }
 
-      const { userId, startDate, endDate, startPlaceId, types, places } = updatePlanDto;
+      const { userId, startDate, endDate, startPlaceId, types, places } =
+        updatePlanDto;
       plan.userId = userId;
       plan.startDate = startDate;
       plan.endDate = endDate;

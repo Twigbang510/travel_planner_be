@@ -15,7 +15,7 @@ import { GoogleSheetModule } from '../google-sheet/google-sheet.module';
     PlaceModule,
     ConfigModule,
     SequelizeModule.forFeature([Plan, Place, PlanPlaceDetail, User]),
-    GoogleSheetModule
+    GoogleSheetModule,
   ],
   controllers: [PlanController],
   providers: [PlanService],

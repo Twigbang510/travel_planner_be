@@ -33,6 +33,6 @@ export class Plan extends Model {
   @Column({ type: DataType.JSON, allowNull: false })
   types: string[];
 
-  @BelongsToMany(() => Place, () => PlanPlaceDetail)
-  places: Place[];
+  @HasMany(() => PlanPlaceDetail)
+  planPlaceDetails: PlanPlaceDetail[];
 }

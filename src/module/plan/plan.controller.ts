@@ -23,17 +23,25 @@ export class PlanController {
   async create(@Body() createPlanDto: CreatePlanDto) {
     return this.planService.create(createPlanDto);
   }
-  @Get(':userId')
+
+  @Get('/user/:userId')
   async getPlansByUserId(@Param('userId') userId: number): Promise<Plan[]> {
     return this.planService.getPlansByUserId(userId);
   }
+
+  @Get('/:planId')
+  async getPlanById(@Param('planId') planId: number): Promise<Plan> {
+    return this.planService.getPlanById(planId);
+  }
+
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePlanDto: UpdatePlanDto) {
-    return this.planService.update(+id, updatePlanDto);
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async update(@Param('id') id: number, @Body() updatePlanDto: UpdatePlanDto) {
+    return this.planService.update(id, updatePlanDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.planService.remove(+id);
+  async remove(@Param('id') id: number) {
+    return this.planService.remove(id);
   }
 }

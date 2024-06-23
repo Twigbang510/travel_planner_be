@@ -526,7 +526,7 @@ export class GooglemapsPlaceService {
 
             if (nextDate <= totalDates) {
               placeList.push({
-                bestPlace,
+                placeId : bestPlace.place_id,
                 type,
                 indexOfDate: localCurrentDate,
                 averageTime: this.averageVisitTimes[type],
@@ -546,7 +546,7 @@ export class GooglemapsPlaceService {
 
       const detailedPlaceList = await Promise.all(
         placeList.map(async (place) => {
-          const details = await this.getPlaceDetails(place.bestPlace.place_id);
+          const details = await this.getPlaceDetails(place.placeId);
           return {
             ...place,
             details,

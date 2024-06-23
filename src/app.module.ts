@@ -9,6 +9,7 @@ import { TokenModule } from './module/token/token.module';
 import { GooglemapsPlaceModule } from './module/googlemaps-place/googlemaps-place.module';
 import { PlanModule } from './module/plan/plan.module';
 import { PlaceModule } from './module/place/place.module';
+import { GoogleSheetModule } from './module/google-sheet/google-sheet.module';
 
 @Module({
   imports: [
@@ -37,6 +38,8 @@ import { PlaceModule } from './module/place/place.module';
     PlaceModule,
 
     PlanModule,
+
+    GoogleSheetModule,
   ],
 })
 export class AppModule {}

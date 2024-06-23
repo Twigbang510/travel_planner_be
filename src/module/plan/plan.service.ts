@@ -6,6 +6,7 @@ import { Plan } from './entities/plan.entity';
 import { Place } from '../place/entities/place.entity';
 import { PlanPlaceDetail } from './entities/plan-detail.entity';
 import { User } from '../user/entities/user.entity';
+import { GoogleSheetsService } from '../google-sheet/google-sheet.service';
 
 @Injectable()
 export class PlanService {
@@ -13,6 +14,9 @@ export class PlanService {
     @InjectModel(Plan) private readonly planModel: typeof Plan,
     @InjectModel(Place) private readonly placeModel: typeof Place,
     @InjectModel(PlanPlaceDetail) private readonly planPlaceDetailModel: typeof PlanPlaceDetail,
+    @InjectModel(User) private readonly userModel: typeof User,
+    private readonly googleSheetsService: GoogleSheetsService,
+
   ) {}
 
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
@@ -94,6 +98,29 @@ export class PlanService {
       throw new NotFoundException('Could not fetch Plan. Please try again later.');
     }
   }
+  public async exportPlan(planId: number): Promise<void> {
+    try {
+      const plan = await this.planModel.findOne({
+        where: { id: planId },
+        include: [
+          {
+            model: PlanPlaceDetail,
+            include: [Place],
+          },
+        ],
+      });
+      if (!plan) {
+        throw new NotFoundException('Plan not found');
+      }
+      
+      const sheetDetail = this.googleSheetsService.createSpreadsheet("Plan",plan)
+      if ( sheetDetail ) return sheetDetail
+    } catch (error) {
+      console.error('Error exporting plans by planId and email to Google Sheets:', error);
+      throw new Error('Could not export plans to Google Sheets. Please try again later.');
+    }
+  }
+
 
   async update(id: number, updatePlanDto: UpdatePlanDto): Promise<Plan> {
     try {

@@ -66,4 +66,8 @@ export class AppConfigService {
   get googleEndpointId(): string {
     return this.configService.get<string>('GOOGLE_ENDPOINT_ID');
   }
+
+  get googleCredentials(): string {
+    return this.configService.get<string>('GOOGLE_APPLICATION_CREDENTIALS');
+  }
 }

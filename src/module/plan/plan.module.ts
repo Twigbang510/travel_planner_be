@@ -7,12 +7,15 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { PlaceModule } from '../place/place.module';
 import { ConfigModule } from '../config/config.module';
 import { Place } from '../place/entities/place.entity';
+import { User } from '../user/entities/user.entity';
+import { GoogleSheetModule } from '../google-sheet/google-sheet.module';
 
 @Module({
   imports: [
     PlaceModule,
     ConfigModule,
-    SequelizeModule.forFeature([Plan, Place, PlanPlaceDetail]),
+    SequelizeModule.forFeature([Plan, Place, PlanPlaceDetail, User]),
+    GoogleSheetModule
   ],
   controllers: [PlanController],
   providers: [PlanService],

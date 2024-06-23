@@ -34,6 +34,10 @@ export class PlanController {
     return this.planService.getPlanById(planId);
   }
 
+  @Post('export/:planId')
+  async exportPlan(@Param('planId') planId: number): Promise<void> {
+    return this.planService.exportPlan(planId);
+  }
   @Patch(':id')
   @UsePipes(new ValidationPipe({ transform: true }))
   async update(@Param('id') id: number, @Body() updatePlanDto: UpdatePlanDto) {

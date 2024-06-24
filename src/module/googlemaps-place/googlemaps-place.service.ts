@@ -875,7 +875,7 @@ export class GooglemapsPlaceService {
         break; // No more nodes can be visited within the time limit
       }
 
-      current = { ...nearest, order: dayOrder }; // Move to the nearest unvisited node
+      current = { ...nearest, position: dayOrder }; // Move to the nearest unvisited node
       currentTime += minTravelTime; // Add travel time to the current time
       removeVisitedPlace(nearest.type, nearest.name); // Remove visited place from places
       dayOrder++;

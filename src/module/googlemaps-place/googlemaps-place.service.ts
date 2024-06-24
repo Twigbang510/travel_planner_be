@@ -133,7 +133,16 @@ export class GooglemapsPlaceService {
   private formatTime(date: number): string {
     return new Date(date).toLocaleTimeString('en-US', { hour12: false });
   }
-
+  private groupByDate(placeList: any[]): any {
+    return placeList.reduce((acc, place) => {
+      const date = place.currentDate.toISOString(); 
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(place);
+      return acc;
+    }, {});
+  }
   async getCityAutocomplete(input: string) {
     try {
       const response = await this.googleMapsClient.placeAutocomplete({
@@ -607,6 +616,7 @@ export class GooglemapsPlaceService {
           };
         }),
       );
+      const groupedPlaces = this.groupByDate(detailedPlaceList);
 
       return {
         userID: userID,
@@ -614,7 +624,7 @@ export class GooglemapsPlaceService {
         startPlaceId: startPlaceId,
         startLocation: startLocation,
         types: types,
-        placeList: detailedPlaceList,
+        placeList: groupedPlaces,
       };
     } catch (error) {
       console.error(error.message);

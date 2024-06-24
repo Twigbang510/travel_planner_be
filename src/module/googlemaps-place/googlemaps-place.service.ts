@@ -526,7 +526,7 @@ export class GooglemapsPlaceService {
 
             if (nextDate <= totalDates) {
               placeList.push({
-                placeId : bestPlace.place_id,
+                placeId: bestPlace.place_id,
                 type,
                 indexOfDate: localCurrentDate,
                 averageTime: this.averageVisitTimes[type],

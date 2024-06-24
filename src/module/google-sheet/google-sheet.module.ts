@@ -8,6 +8,6 @@ import { ConfigModule } from '../config/config.module';
   imports: [ConfigModule],
   controllers: [GoogleSheetsController],
   providers: [GoogleSheetsService],
-  exports: [GoogleSheetsService]
+  exports: [GoogleSheetsService],
 })
 export class GoogleSheetModule {}

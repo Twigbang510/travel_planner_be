@@ -31,20 +31,24 @@ export class GoogleSheetsService {
       },
     };
     const dataAppend = {
-      data : data.dataValues,
-    }
+      data: data.dataValues,
+    };
     try {
       const response = await this.sheets.spreadsheets.create(request);
       console.log(`Spreadsheet created:`, response.data);
       const spreadDetail = {
         speadTitle: response.data.properties.title,
         spreadsheetId: response.data.spreadsheetId,
-        spreadsheetUrl: response.data.spreadsheetUrl
-      }
-      await this.setSpreadsheetPublic(spreadDetail.spreadsheetId)
-      await this.appendData(spreadDetail.spreadsheetId,spreadDetail.speadTitle,dataAppend)
+        spreadsheetUrl: response.data.spreadsheetUrl,
+      };
+      await this.setSpreadsheetPublic(spreadDetail.spreadsheetId);
+      await this.appendData(
+        spreadDetail.spreadsheetId,
+        spreadDetail.speadTitle,
+        dataAppend,
+      );
       return spreadDetail;
-    }catch(err) {
+    } catch (err) {
       console.error('Error creating spreadsheet:', err);
       throw err;
     }
@@ -76,15 +80,24 @@ export class GoogleSheetsService {
   }
 
   async appendData(spreadsheetId: string, sheetTitle: string, data: any) {
-    console.log("Append DAta",data)
+    console.log('Append DAta', data);
     const rows = [
       ['startDate', data.data.startDate],
       ['endDate', data.data.endDate],
       [],
-      ['Address', 'name', 'Index of Date', 'Average Time', 'From Time', 'Next Time', 'Position', 'Date']
+      [
+        'Address',
+        'name',
+        'Index of Date',
+        'Average Time',
+        'From Time',
+        'Next Time',
+        'Position',
+        'Date',
+      ],
     ];
 
-    data.data.planPlaceDetails.forEach(detail => {
+    data.data.planPlaceDetails.forEach((detail) => {
       rows.push([
         detail.place.formatted_address,
         detail.place.name,
@@ -93,7 +106,7 @@ export class GoogleSheetsService {
         detail.fromTime,
         detail.nextTime,
         detail.position,
-        detail.currentDate
+        detail.currentDate,
       ]);
     });
 

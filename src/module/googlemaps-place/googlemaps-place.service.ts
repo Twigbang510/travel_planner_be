@@ -1,5 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Client, TravelMode } from '@googlemaps/google-maps-services-js';
+import { Client, PlaceAutocompleteType, TravelMode } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
@@ -134,6 +134,60 @@ export class GooglemapsPlaceService {
     return new Date(date).toLocaleTimeString('en-US', { hour12: false });
   }
 
+  async getCityAutocomplete(input: string) {
+    try {
+      const response = await this.googleMapsClient.placeAutocomplete({
+        params: {
+          input,
+          types: PlaceAutocompleteType.cities,
+          key: this.configService.googleMapsKey,
+        },
+      });
+
+      return response.data.predictions.map(prediction => ({
+        description: prediction.description,
+        place_id: prediction.place_id,
+      }));
+    } catch (error) {
+      console.error(error.message);
+      throw new HttpException(
+        'Error fetching autocomplete results',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async findHotelsByCity(placeId: string) {
+    try {
+      const placeDetails = await this.getPlaceDetails(placeId);
+      const { lat, lng } = placeDetails.geometry.location;
+      
+      const response = await this.googleMapsClient.placesNearby({
+        params: {
+          location: { lat, lng },
+          radius: 15000, 
+          type: 'lodging', 
+          key: this.configService.googleMapsKey,
+        },
+      });
+      const placeIds = response.data.results.map((place) => place.place_id);
+
+      const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds)
+      const hotelsList = [];
+      await Promise.all(reviewScores.map(async (place) => {
+        const hotelDetail = await this.getPlaceDetails(place.place_id);
+        hotelsList.push(hotelDetail)
+      }))
+
+      return hotelsList;
+    } catch (error) {
+      console.error(error.message);
+      throw new HttpException(
+        'Error fetching hotels',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
   /**
    * Calculate the next time and date based on the current time and average visit time for a place type.
    * @param currentTime - The current time in milliseconds.

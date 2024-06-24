@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { GooglemapsPlaceService } from './googlemaps-place.service';
 import { GetPlaceIdDto } from './dto/place-detail.dto';
 import { NearbySearchDto } from './dto/nearby-search.dto';
@@ -16,7 +16,20 @@ export class GooglemapsPlaceController {
   getPlace(@Body() getPlaceIdDto: GetPlaceIdDto): Promise<any> {
     return this.googlemapsPlaceService.getPlaceDetails(getPlaceIdDto.placeId);
   }
-
+  @Get('autocomplete')
+  async getCityAutocomplete(@Query('input') input: string) {
+    if (!input) {
+      throw new HttpException('Input is required', HttpStatus.BAD_REQUEST);
+    }
+    return this.googlemapsPlaceService.getCityAutocomplete(input);
+  }
+  @Get('hotels')
+  async findHotelsByCity(@Query('placeId') placeId: string) {
+    if (!placeId) {
+      throw new HttpException('Place ID is required', HttpStatus.BAD_REQUEST);
+    }
+    return this.googlemapsPlaceService.findHotelsByCity(placeId);
+  }
   @Post('getplan')
   getPlan(
     @Body() nearbySearchDto: NearbySearchDto,

@@ -64,8 +64,8 @@ export class AuthService {
         email: userData.email,
         picture: userData.picture,
       },
-      token: token
-    }
-    return userResponse
+      token: token,
+    };
+    return userResponse;
   }
 }

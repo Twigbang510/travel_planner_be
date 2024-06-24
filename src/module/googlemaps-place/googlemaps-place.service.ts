@@ -1,5 +1,9 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Client, PlaceAutocompleteType, TravelMode } from '@googlemaps/google-maps-services-js';
+import {
+  Client,
+  PlaceAutocompleteType,
+  TravelMode,
+} from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
@@ -10,15 +14,9 @@ export class GooglemapsPlaceService {
   private googleMapsClient: Client;
   private language = require('@google-cloud/language');
   private client = new this.language.LanguageServiceClient();
-  private currentDate = 1;
   private currentTime = new Date().setHours(6, 0, 0, 0);
   private endTime = new Date().setHours(20, 0, 0, 0);
-  private DANANG_BOUNDING_BOX = {
-    north: 16.154564,
-    south: 15.975568,
-    east: 108.276413,
-    west: 107.985724,
-  };
+
   private readonly averageVisitTimes = {
     accounting: 30,
     airport: 120,
@@ -133,9 +131,15 @@ export class GooglemapsPlaceService {
   private formatTime(date: number): string {
     return new Date(date).toLocaleTimeString('en-US', { hour12: false });
   }
+
+  /**
+   * Group the place list by date.
+   * @param placeList - The list of places to be grouped.
+   * @returns An object with dates as keys and arrays of places as values.
+   */
   private groupByDate(placeList: any[]): any {
     return placeList.reduce((acc, place) => {
-      const date = place.currentDate.toISOString(); 
+      const date = place.currentDate.toISOString();
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -143,6 +147,13 @@ export class GooglemapsPlaceService {
       return acc;
     }, {});
   }
+
+  /**
+   * Fetches autocomplete results for a given city input.
+   * @param input - The city name input.
+   * @returns A promise that resolves to an array of autocomplete results.
+   * @throws HttpException if there is an error fetching the autocomplete results.
+   */
   async getCityAutocomplete(input: string) {
     try {
       const response = await this.googleMapsClient.placeAutocomplete({
@@ -153,7 +164,7 @@ export class GooglemapsPlaceService {
         },
       });
 
-      return response.data.predictions.map(prediction => ({
+      return response.data.predictions.map((prediction) => ({
         description: prediction.description,
         place_id: prediction.place_id,
       }));
@@ -166,27 +177,37 @@ export class GooglemapsPlaceService {
     }
   }
 
+  /**
+   * Fetches hotels near a given city.
+   *
+   * @param placeId - The place ID of the city.
+   * @returns A promise that resolves to an array of hotel details.
+   * @throws HttpException if there is an error fetching the hotels.
+   */
   async findHotelsByCity(placeId: string) {
     try {
       const placeDetails = await this.getPlaceDetails(placeId);
       const { lat, lng } = placeDetails.geometry.location;
-      
+
       const response = await this.googleMapsClient.placesNearby({
         params: {
           location: { lat, lng },
-          radius: 15000, 
-          type: 'lodging', 
+          radius: 15000,
+          type: 'lodging',
           key: this.configService.googleMapsKey,
         },
       });
       const placeIds = response.data.results.map((place) => place.place_id);
 
-      const reviewScores = await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds)
+      const reviewScores =
+        await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
       const hotelsList = [];
-      await Promise.all(reviewScores.map(async (place) => {
-        const hotelDetail = await this.getPlaceDetails(place.place_id);
-        hotelsList.push(hotelDetail)
-      }))
+      await Promise.all(
+        reviewScores.map(async (place) => {
+          const hotelDetail = await this.getPlaceDetails(place.place_id);
+          hotelsList.push(hotelDetail);
+        }),
+      );
 
       return hotelsList;
     } catch (error) {
@@ -197,12 +218,20 @@ export class GooglemapsPlaceService {
       );
     }
   }
+
   /**
    * Calculate the next time and date based on the current time and average visit time for a place type.
+   *
    * @param currentTime - The current time in milliseconds.
    * @param localCurrentDate - The current date as a number.
    * @param type - The place type.
-   * @returns The next time and date.
+   * @param totalDates - The total number of dates in the range.
+   * @param previousPlaceId - The ID of the previous place.
+   * @param bestPlace - The best place found so far.
+   * @param firstTime - A boolean indicating if it's the first time on a new date.
+   * @param currentDate - The current date.
+   *
+   * @returns An object containing the next time, next date, travel time, previous place ID, first time flag, and current date.
    */
   private async getNextTime(
     currentTime: number,
@@ -258,6 +287,7 @@ export class GooglemapsPlaceService {
       currentDate,
     };
   }
+
   /**
    * Get the place with the highest sentiment score from the results.
    * @param draftPlaceList - List of locations of each type.
@@ -315,9 +345,11 @@ export class GooglemapsPlaceService {
   }
 
   /**
-   * Analyze the sentiment of the reviews.
-   * @param reviews - The place reviews.
-   * @returns The sentiment result.
+   * Analyzes the sentiment of the reviews for a specific place.
+   *
+   * @param reviews - The reviews of a place. It contains the place ID and the reviews.
+   * @returns A promise that resolves to a sentiment result. The result contains the place ID and the sentiment score.
+   * @throws An error if the sentiment analysis fails.
    */
   private async analyzeSentiment(reviews: {
     place_id: string;

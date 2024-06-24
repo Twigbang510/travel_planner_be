@@ -14,7 +14,7 @@ export class GooglemapsPlaceService {
   private googleMapsClient: Client;
   private language = require('@google-cloud/language');
   private client = new this.language.LanguageServiceClient();
-  private currentTime = new Date().setHours(6, 0, 0, 0);
+  private startTime = new Date().setHours(6, 0, 0, 0);
   private endTime = new Date().setHours(20, 0, 0, 0);
 
   private readonly averageVisitTimes = {
@@ -112,7 +112,7 @@ export class GooglemapsPlaceService {
   };
   private readonly placeTypes = {
     outdoor: ['zoo', 'aquarium', 'cafe', 'bowling_alley'],
-    art: ['art_gallery', 'painter'],
+    art: ['art_gallery'],
     park: ['amusement_park', 'park'],
     shopping: ['convenience_store', 'shopping_mall'],
     historical: ['church', 'hindu_temple', 'museum'],
@@ -424,6 +424,7 @@ export class GooglemapsPlaceService {
       const response = await this.googleMapsClient.placesNearby({ params });
       const places = response.data.results.map((place) => ({
         place_id: place.place_id,
+        place_location: place.geometry.location,
       }));
       return {
         nextPage: response.data.next_page_token || '',
@@ -496,7 +497,6 @@ export class GooglemapsPlaceService {
           key: this.configService.googleMapsKey,
         },
       });
-
       if (data.routes.length) {
         const travelTime = data.routes[0].legs[0].duration.value;
         return travelTime;
@@ -536,7 +536,7 @@ export class GooglemapsPlaceService {
     const placeList = [];
     const draftPlaceList: { [key: string]: any[] } = {};
     try {
-      let localCurrentTime = this.currentTime;
+      let localCurrentTime = this.startTime;
       let localCurrentDate = 0;
       let previousDate = 1;
       const nextPageToken: { [key: string]: string } = {};
@@ -590,7 +590,6 @@ export class GooglemapsPlaceService {
             startPlaceId,
             previousPlaceId,
           );
-
           if (bestPlace) {
             const {
               fromTime,
@@ -665,5 +664,198 @@ export class GooglemapsPlaceService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+  async getItinerary(nearbySearchDto: NearbySearchDto, userID: string) {
+    const {
+      lat,
+      lng,
+      types,
+      date_range,
+      radius = 15000,
+      placeId: startPlaceId,
+    } = nearbySearchDto;
+
+    const draftPlaceList: { [key: string]: any[] } = {};
+    const startDate = new Date(date_range[0]);
+    const endDate = new Date(date_range[1]);
+    const totalDates =
+      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    const timeLimitperDay = (20 - 6) * 60;
+    const placeList: any[] = [];
+    const nextPageToken: { [key: string]: string } = {};
+    const placesPromises: Promise<void>[] = [];
+
+    for (const key of types) {
+      const array = this.placeTypes[key];
+      for (const type of array) {
+        if (!draftPlaceList[type]) {
+          try {
+            const { nextPage, places } = await this.fetchNearbyPlaces(
+              lat,
+              lng,
+              type,
+              radius,
+              nextPageToken[type],
+            );
+            nextPageToken[type] = nextPage;
+
+            const placeIds = places.map((place) => place.place_id);
+            const reviewScores =
+              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+            draftPlaceList[type] = reviewScores.map((score, index) => ({
+              ...places[index],
+              reviewScore: score,
+            }));
+          } catch (error) {
+            console.error(
+              `Error fetching or processing places for type '${type}':`,
+              error,
+            );
+          }
+        }
+      }
+    }
+
+    // Example: Add startPlace to placeList
+    const startPlace = {
+      place_id: startPlaceId,
+      lat: lat,
+      lng: lng,
+      visitTime: 0,
+    };
+    placeList.push(startPlace);
+
+    await Promise.all(placesPromises);
+    const optimalPaths = await this.findOptimalPathsForDays(
+      draftPlaceList,
+      startPlace,
+      totalDates,
+      timeLimitperDay,
+      startDate,
+    );
+    return optimalPaths;
+  }
+  async findOptimalPathsForDays(
+    places,
+    startPlace,
+    numDays,
+    timeLimitperDay,
+    startDate,
+  ) {
+    const optimalPaths = [];
+    let currentDate = new Date(startDate);
+    for (let i = 0; i <= numDays; i++) {
+      const optimalPath = await this.nearestNeighborTSPForDay(
+        places,
+        startPlace,
+        timeLimitperDay,
+      );
+      optimalPaths.push({
+        day: currentDate.toISOString(),
+        path: optimalPath,
+      });
+
+      // Remove chosen places from places object
+      optimalPath.forEach((node) => {
+        if (node.type !== 'start') {
+          places[node.type] = places[node.type].filter(
+            (place) => place.name !== node.name,
+          );
+        }
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return optimalPaths;
+  }
+  async nearestNeighborTSPForDay(places, startPlace, timeLimitperDay) {
+    const types = Object.keys(places);
+    const nodes = {};
+
+    types.forEach((type) => {
+      nodes[type] = places[type].map((place) => ({
+        type: type,
+        place_id: place.place_id,
+        lat: place.place_location.lat,
+        lng: place.place_location.lng,
+        score: place.reviewScore.score,
+        visitTime: this.averageVisitTimes[type],
+      }));
+    });
+    const path = [];
+    let current = { ...startPlace, type: 'start' };
+    let currentTime = 0;
+    let dayOrder = 0;
+    let lastVisitedType = null;
+    function removeVisitedPlace(type, name) {
+      nodes[type] = nodes[type].filter((node) => node.name !== name);
+    }
+    while (currentTime < timeLimitperDay) {
+      if (current.type !== 'start') {
+        // Skip adding start place to the path
+        const startTime = await this.convertMinutesToTime(currentTime);
+        const endTime = await this.convertMinutesToTime(
+          currentTime + current.visitTime,
+        );
+
+        path.push({
+          ...current,
+          startTime: startTime,
+          endTime: endTime,
+          order: dayOrder,
+        });
+        currentTime += current.visitTime; // Add visit time for the current place
+      }
+
+      let nearest = null;
+      let minTravelTime = Number.MAX_SAFE_INTEGER;
+
+      // Rotate through types to ensure no two consecutive places have the same type
+      let nextTypes = types.filter((type) => type !== lastVisitedType);
+      console.log("Next types: " + nextTypes)
+      // If no available type is found, reset the list of available types
+      if (nextTypes.length === 0) {
+        nextTypes = types.filter((type) => type !== lastVisitedType);
+      }
+      console.log("types", types)
+      // Find the nearest unvisited node that fits within the time limit and is a different type
+      for (const type of nextTypes) {
+        for (let i = 0; i < nodes[type].length; i++) {
+          const nextNode = nodes[type][i];
+          if (nextNode && nextNode !== current) {
+            const travel = await this.travelTime(current, nextNode);
+            if (currentTime + travel + nextNode.visitTime <= timeLimitperDay) {
+              if (travel < minTravelTime) {
+                minTravelTime = travel;
+                nearest = nextNode;
+                lastVisitedType = type;
+              }
+            }
+          }
+        }
+      }
+
+      if (nearest === null) {
+        break; // No more nodes can be visited within the time limit
+      }
+
+      current = { ...nearest, order: dayOrder }; // Move to the nearest unvisited node
+      currentTime += minTravelTime; // Add travel time to the current time
+      removeVisitedPlace(nearest.type, nearest.name); // Remove visited place from places
+      dayOrder++;
+    }
+    return path;
+  }
+  async travelTime(point1, point2) {
+    const dist = Math.sqrt(
+      Math.pow(point1.lat - point2.lat, 2) +
+        Math.pow(point1.lng - point2.lng, 2),
+    );
+    return dist * 10;
+  }
+  async convertMinutesToTime(minutes) {
+    const hours = Math.floor(minutes / 60) + 6; // Starting from 6 AM
+    const mins = Math.floor(minutes % 60);
+    const secs = Math.floor((minutes - Math.floor(minutes)) * 60);
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 }

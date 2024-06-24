@@ -468,7 +468,14 @@ export class GooglemapsPlaceService {
           ],
         },
       });
-      return response.data.result;
+      const placeDetails = response.data.result;
+
+      const htmlAttributions = placeDetails.photos.map((photo: any) => {
+        return photo.html_attributions[0].match(/href="(.*?)"/)[1];
+      });
+      placeDetails.photos = htmlAttributions;
+
+      return placeDetails;
     } catch (error) {
       console.error(error.message);
       throw new HttpException(
@@ -733,7 +740,34 @@ export class GooglemapsPlaceService {
       timeLimitperDay,
       startDate,
     );
-    return optimalPaths;
+    const detailedOptimalPaths = await Promise.all(
+      Object.keys(optimalPaths).map(async (key) => {
+        return {
+          [key]: await Promise.all(
+            optimalPaths[key].map(async (place) => {
+              const details = await this.getPlaceDetails(place.place_id);
+              return {
+                ...place,
+                details,
+              };
+            })
+          )
+        };
+      })
+    );
+    const planDetail = {
+      userID: userID,
+      date_range,
+      startPlaceId: startPlaceId,
+      startLocation: {
+        lat: lat,
+        lng: lng,
+      },
+      types: types,
+      placeList: detailedOptimalPaths,
+    };
+
+    return planDetail;
   }
   async findOptimalPathsForDays(
     places,
@@ -742,19 +776,16 @@ export class GooglemapsPlaceService {
     timeLimitperDay,
     startDate,
   ) {
-    const optimalPaths = [];
+    const optimalPaths = {};
     let currentDate = new Date(startDate);
     for (let i = 0; i <= numDays; i++) {
       const optimalPath = await this.nearestNeighborTSPForDay(
         places,
         startPlace,
         timeLimitperDay,
+        currentDate,
       );
-      optimalPaths.push({
-        day: currentDate.toISOString(),
-        path: optimalPath,
-      });
-
+      optimalPaths[currentDate.toISOString()] = optimalPath;
       // Remove chosen places from places object
       optimalPath.forEach((node) => {
         if (node.type !== 'start') {
@@ -767,7 +798,12 @@ export class GooglemapsPlaceService {
     }
     return optimalPaths;
   }
-  async nearestNeighborTSPForDay(places, startPlace, timeLimitperDay) {
+  async nearestNeighborTSPForDay(
+    places,
+    startPlace,
+    timeLimitperDay,
+    currentDate,
+  ) {
     const types = Object.keys(places);
     const nodes = {};
 
@@ -799,9 +835,10 @@ export class GooglemapsPlaceService {
 
         path.push({
           ...current,
-          startTime: startTime,
-          endTime: endTime,
-          order: dayOrder,
+          fromTime: startTime,
+          nextTime: endTime,
+          position: dayOrder,
+          currentDate: currentDate.toISOString(),
         });
         currentTime += current.visitTime; // Add visit time for the current place
       }
@@ -811,12 +848,12 @@ export class GooglemapsPlaceService {
 
       // Rotate through types to ensure no two consecutive places have the same type
       let nextTypes = types.filter((type) => type !== lastVisitedType);
-      console.log("Next types: " + nextTypes)
+      console.log('Next types: ' + nextTypes);
       // If no available type is found, reset the list of available types
       if (nextTypes.length === 0) {
         nextTypes = types.filter((type) => type !== lastVisitedType);
       }
-      console.log("types", types)
+      console.log('types', types);
       // Find the nearest unvisited node that fits within the time limit and is a different type
       for (const type of nextTypes) {
         for (let i = 0; i < nodes[type].length; i++) {
@@ -843,6 +880,7 @@ export class GooglemapsPlaceService {
       removeVisitedPlace(nearest.type, nearest.name); // Remove visited place from places
       dayOrder++;
     }
+    console.log('Path ', path);
     return path;
   }
   async travelTime(point1, point2) {

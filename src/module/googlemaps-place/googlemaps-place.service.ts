@@ -688,7 +688,7 @@ export class GooglemapsPlaceService {
     const totalDates =
       (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
     const timeLimitperDay = (20 - 6) * 60;
-    const placeList: any[] = [];
+    const placeList: { [key: string]: any[] } = {};
     const nextPageToken: { [key: string]: string } = {};
     const placesPromises: Promise<void>[] = [];
 
@@ -723,14 +723,12 @@ export class GooglemapsPlaceService {
       }
     }
 
-    // Example: Add startPlace to placeList
     const startPlace = {
       place_id: startPlaceId,
       lat: lat,
       lng: lng,
       visitTime: 0,
     };
-    placeList.push(startPlace);
 
     await Promise.all(placesPromises);
     const optimalPaths = await this.findOptimalPathsForDays(
@@ -740,21 +738,25 @@ export class GooglemapsPlaceService {
       timeLimitperDay,
       startDate,
     );
-    const detailedOptimalPaths = await Promise.all(
-      Object.keys(optimalPaths).map(async (key) => {
-        return {
-          [key]: await Promise.all(
-            optimalPaths[key].map(async (place) => {
-              const details = await this.getPlaceDetails(place.place_id);
-              return {
-                ...place,
-                details,
-              };
-            })
-          )
-        };
-      })
+
+    const detailedOptimalPaths = await Object.keys(optimalPaths).reduce(
+      async (accPromise, key) => {
+        const acc = await accPromise;
+        const detailedPlaces = await Promise.all(
+          optimalPaths[key].map(async (place) => {
+            const details = await this.getPlaceDetails(place.place_id);
+            return {
+              ...place,
+              details,
+            };
+          }),
+        );
+        acc[key] = detailedPlaces;
+        return acc;
+      },
+      Promise.resolve({}),
     );
+
     const planDetail = {
       userID: userID,
       date_range,
@@ -769,6 +771,7 @@ export class GooglemapsPlaceService {
 
     return planDetail;
   }
+
   async findOptimalPathsForDays(
     places,
     startPlace,

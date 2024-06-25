@@ -40,12 +40,7 @@ export class Place extends Model<Place> {
     type: DataType.JSON,
     allowNull: false,
   })
-  photos: Array<{
-    height: number;
-    html_attributions: string[];
-    photo_reference: string;
-    width: number;
-  }>;
+  photos: string[];
 
   @Column({
     type: DataType.STRING,
@@ -55,21 +50,21 @@ export class Place extends Model<Place> {
 
   @Column({
     type: DataType.FLOAT,
-    allowNull: false,
+    allowNull: true,
   })
-  rating: number;
+  rating?: number;
 
   @Column({
     type: DataType.INTEGER,
-    allowNull: false,
+    allowNull: true,
   })
-  user_ratings_total: number;
+  user_ratings_total?: number;
 
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
   })
-  website: string;
+  website?: string;
 
   @HasMany(() => PlanPlaceDetail)
   planPlaceDetails: PlanPlaceDetail[];

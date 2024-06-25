@@ -88,7 +88,6 @@ export class GoogleSheetsService {
       [
         'Address',
         'name',
-        'Index of Date',
         'Average Time',
         'From Time',
         'Next Time',
@@ -101,7 +100,6 @@ export class GoogleSheetsService {
       rows.push([
         detail.place.formatted_address,
         detail.place.name,
-        detail.indexOfDate,
         detail.averageTime,
         detail.fromTime,
         detail.nextTime,

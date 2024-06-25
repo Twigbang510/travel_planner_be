@@ -20,38 +20,54 @@ export class PlanService {
   ) {}
 
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
+    const transaction = await this.planModel.sequelize.transaction();
     try {
-      const { userId, startDate, endDate, startPlaceId, types, places } =
-        createPlanDto;
-
+      const { userId, date_range, startPlaceId, types, placeList } = createPlanDto;
+      const user = await this.userModel.findByPk(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
       const plan = await this.planModel.create({
         userId,
-        startDate,
-        endDate,
+        startDate: date_range[0],
+        endDate: date_range[1],
         startPlaceId,
         types,
-      });
-
-      for (const placeWithDetails of places) {
-        const placeData = placeWithDetails.place;
-        const placeDetailData = placeWithDetails.placeDetails;
-
-        let place = await this.placeModel.findOne({
-          where: { place_id: placeData.place_id },
-        });
-        if (!place) {
-          place = await this.placeModel.create(placeData);
+      }, { transaction });
+  
+      for (const [date, places] of Object.entries(placeList)) {
+        for (const placeWithDetails of places) {
+          const placeData = placeWithDetails.details;
+          const placeDetailData = {
+            type: placeWithDetails.type,
+            indexOfDate: placeWithDetails.position,
+            averageTime: placeWithDetails.visitTime,
+            fromTime: placeWithDetails.fromTime,
+            nextTime: placeWithDetails.nextTime,
+            position: placeWithDetails.position,
+            currentDate: placeWithDetails.currentDate,
+          };
+  
+          let place = await this.placeModel.findOne({
+            where: { place_id: placeData.place_id },
+            transaction,
+          });
+          if (!place) {
+            place = await this.placeModel.create(placeData, { transaction });
+          }
+  
+          await this.planPlaceDetailModel.create({
+            ...placeDetailData,
+            placeId: place.id,
+            planId: plan.id,
+          }, { transaction });
         }
-
-        await this.planPlaceDetailModel.create({
-          ...placeDetailData,
-          placeId: place.id,
-          planId: plan.id,
-        });
       }
-
+  
+      await transaction.commit();
       return plan;
     } catch (error) {
+      await transaction.rollback();
       console.error('Error when creating Plan', error);
       throw new Error('Could not create Plan. Please try again later.');
     }
@@ -137,45 +153,65 @@ export class PlanService {
   }
 
   async update(id: number, updatePlanDto: UpdatePlanDto): Promise<Plan> {
+    const transaction = await this.planModel.sequelize.transaction();
     try {
-      const plan = await this.planModel.findByPk(id);
+      const { userId, date_range, startPlaceId, types, placeList } = updatePlanDto;
+  
+      // Check if user exists
+      const user = await this.userModel.findByPk(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+  
+      const plan = await this.planModel.findByPk(id, { transaction });
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
-
-      const { userId, startDate, endDate, startPlaceId, types, places } =
-        updatePlanDto;
       plan.userId = userId;
-      plan.startDate = startDate;
-      plan.endDate = endDate;
+      plan.startDate = date_range[0];
+      plan.endDate = date_range[1];
       plan.startPlaceId = startPlaceId;
       plan.types = types;
-      await plan.save();
-
-      // Optionally update places and place details if they are part of the update payload
-      if (places) {
-        await this.planPlaceDetailModel.destroy({ where: { planId: plan.id } });
-        for (const placeWithDetails of places) {
-          const placeData = placeWithDetails.place;
-          const placeDetailData = placeWithDetails.placeDetails;
-
-          let place = await this.placeModel.findOne({
-            where: { place_id: placeData.place_id },
-          });
-          if (!place) {
-            place = await this.placeModel.create(placeData);
+      await plan.save({ transaction });
+  
+      // Update places and place details
+      if (placeList) {
+        await this.planPlaceDetailModel.destroy({ where: { planId: plan.id }, transaction });
+  
+        for (const [date, places] of Object.entries(placeList)) {
+          for (const placeWithDetails of places) {
+            const placeData = placeWithDetails.details;
+            const placeDetailData = {
+              type: placeWithDetails.type,
+              indexOfDate: placeWithDetails.position,
+              averageTime: placeWithDetails.visitTime,
+              fromTime: placeWithDetails.fromTime,
+              nextTime: placeWithDetails.nextTime,
+              position: placeWithDetails.position,
+              currentDate: placeWithDetails.currentDate,
+            };
+  
+            let place = await this.placeModel.findOne({
+              where: { place_id: placeData.place_id },
+              transaction,
+            });
+            if (!place) {
+              place = await this.placeModel.create(placeData, { transaction });
+            }
+  
+            await this.planPlaceDetailModel.create({
+              ...placeDetailData,
+              placeId: place.id,
+              planId: plan.id,
+            }, { transaction });
           }
-
-          await this.planPlaceDetailModel.create({
-            ...placeDetailData,
-            placeId: place.id,
-            planId: plan.id,
-          });
         }
       }
-
+  
+      await transaction.commit();
       return plan;
     } catch (error) {
+      await transaction.rollback();
       console.error('Error when updating Plan', error);
       throw new Error('Could not update Plan. Please try again later.');
     }

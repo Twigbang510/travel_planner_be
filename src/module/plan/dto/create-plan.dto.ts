@@ -42,24 +42,51 @@ class PlaceWithDetailsDto {
 }
 
 export class CreatePlanDto {
-  @IsNumber()
   userId: number;
-
-  @IsDateString()
-  startDate: string;
-
-  @IsDateString()
-  endDate: string;
-
-  @IsString()
+  date_range: [string, string];
   startPlaceId: string;
-
-  @IsArray()
-  @IsString({ each: true })
+  startLocation: {
+    lat: number;
+    lng: number;
+  };
   types: string[];
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PlaceWithDetailsDto)
-  places: PlaceWithDetailsDto[];
+  placeList: {
+    [key: string]: Array<{
+      type: string;
+      place_id: string;
+      lat: number;
+      lng: number;
+      score: number;
+      visitTime: number;
+      position: number;
+      fromTime: string;
+      nextTime: string;
+      currentDate: string;
+      details: {
+        formatted_address: string;
+        geometry: {
+          location: {
+            lat: number;
+            lng: number;
+          };
+          viewport: {
+            northeast: {
+              lat: number;
+              lng: number;
+            };
+            southwest: {
+              lat: number;
+              lng: number;
+            };
+          };
+        };
+        name: string;
+        photos: string[];
+        place_id: string;
+        rating?: number;
+        user_ratings_total?: number;
+        website?: string;
+      };
+    }>;
+  };
 }

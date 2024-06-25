@@ -10,9 +10,9 @@ export class PlaceService {
     @InjectModel(Place)
     private placeModel: typeof Place,
   ) {}
-  create(createPlaceDto: CreatePlaceDto) {
-    return this.placeModel.create(createPlaceDto);
-  }
+  // create(createPlaceDto: CreatePlaceDto) {
+  //   return this.placeModel.create(createPlaceDto);
+  // }
 
   findAll() {
     return `This action returns all place`;

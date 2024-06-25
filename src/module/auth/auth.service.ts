@@ -60,6 +60,7 @@ export class AuthService {
     const token = await this.tokenService.getToken(userData.id);
     const userResponse = {
       userData: {
+        userId: userData.id,
         username: userData.username,
         email: userData.email,
         picture: userData.picture,

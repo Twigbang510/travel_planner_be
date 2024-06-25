@@ -269,9 +269,9 @@ export class GooglemapsPlaceService {
     if (localCurrentDate <= totalDates) {
       travelTime = previousPlaceId
         ? (await this.calculateTravelTime(
-            previousPlaceId,
-            bestPlace.place_id,
-          )) / 60
+          previousPlaceId,
+          bestPlace.place_id,
+        )) / 60
         : 0;
       previousPlaceId = bestPlace.place_id;
       firstTime = false;
@@ -378,7 +378,9 @@ export class GooglemapsPlaceService {
     );
     const placeReviews = await Promise.all(placeReviewsPromises);
     const filteredReviews = placeReviews.filter((reviews) => reviews !== null);
-
+    if (placeReviews.length === 0) {
+      return []; // Trả về mảng trống nếu không có đánh giá nào
+    }
     const scores = await Promise.all(
       filteredReviews.map((reviews) => this.analyzeSentiment(reviews)),
     );
@@ -469,11 +471,14 @@ export class GooglemapsPlaceService {
         },
       });
       const placeDetails = response.data.result;
-
-      const htmlAttributions = placeDetails.photos.map((photo: any) => {
-        return photo.html_attributions[0].match(/href="(.*?)"/)[1];
-      });
-      placeDetails.photos = htmlAttributions;
+      if (placeDetails.photos) {
+        const htmlAttributions = placeDetails.photos.map((photo: any) => {
+          return photo.html_attributions[0].match(/href="(.*?)"/)[1];
+        });
+        placeDetails.photos = htmlAttributions;
+      } else {
+        placeDetails.photos = []; // Khởi tạo mảng trống nếu không có photos
+      }
 
       return placeDetails;
     } catch (error) {
@@ -673,103 +678,114 @@ export class GooglemapsPlaceService {
     }
   }
   async getItinerary(nearbySearchDto: NearbySearchDto, userID: string) {
-    const {
-      lat,
-      lng,
-      types,
-      date_range,
-      radius = 15000,
-      placeId: startPlaceId,
-    } = nearbySearchDto;
+    try {
+      const {
+        lat,
+        lng,
+        types,
+        date_range,
+        radius = 15000,
+        placeId: startPlaceId,
+      } = nearbySearchDto;
 
-    const draftPlaceList: { [key: string]: any[] } = {};
-    const startDate = new Date(date_range[0]);
-    const endDate = new Date(date_range[1]);
-    const totalDates =
-      (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
-    const timeLimitperDay = (20 - 6) * 60;
-    const placeList: { [key: string]: any[] } = {};
-    const nextPageToken: { [key: string]: string } = {};
-    const placesPromises: Promise<void>[] = [];
+      const draftPlaceList: { [key: string]: any[] } = {};
+      const startDate = new Date(date_range[0]);
+      const endDate = new Date(date_range[1]);
+      const totalDates =
+        (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+      const timeLimitperDay = (20 - 6) * 60;
+      const placeList: { [key: string]: any[] } = {};
+      const nextPageToken: { [key: string]: string } = {};
+      const placesPromises: Promise<void>[] = [];
 
-    for (const key of types) {
-      const array = this.placeTypes[key];
-      for (const type of array) {
-        if (!draftPlaceList[type]) {
-          try {
-            const { nextPage, places } = await this.fetchNearbyPlaces(
-              lat,
-              lng,
-              type,
-              radius,
-              nextPageToken[type],
-            );
-            nextPageToken[type] = nextPage;
+      for (const key of types) {
+        const array = this.placeTypes[key];
+        for (const type of array) {
+          if (!draftPlaceList[type]) {
+            try {
+              draftPlaceList[type] = [];
+              const { nextPage, places } = await this.fetchNearbyPlaces(
+                lat,
+                lng,
+                type,
+                radius,
+                nextPageToken[type],
+              );
+              nextPageToken[type] = nextPage;
 
-            const placeIds = places.map((place) => place.place_id);
-            const reviewScores =
-              await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
-            draftPlaceList[type] = reviewScores.map((score, index) => ({
-              ...places[index],
-              reviewScore: score,
-            }));
-          } catch (error) {
-            console.error(
-              `Error fetching or processing places for type '${type}':`,
-              error,
-            );
+              const placeIds = places.map((place) => place.place_id);
+              const reviewScores =
+                await this.fetchPlaceReviewsAndAnalyzeSentiment(placeIds);
+              draftPlaceList[type] = reviewScores.map((score, index) => ({
+                ...places[index],
+                reviewScore: score,
+              }));
+            } catch (error) {
+              console.error(
+                `Error fetching or processing places for type '${type}':`,
+                error,
+              );
+            }
           }
         }
       }
-    }
 
-    const startPlace = {
-      place_id: startPlaceId,
-      lat: lat,
-      lng: lng,
-      visitTime: 0,
-    };
-
-    await Promise.all(placesPromises);
-    const optimalPaths = await this.findOptimalPathsForDays(
-      draftPlaceList,
-      startPlace,
-      totalDates,
-      timeLimitperDay,
-      startDate,
-    );
-
-    const detailedOptimalPaths = await Object.keys(optimalPaths).reduce(
-      async (accPromise, key) => {
-        const acc = await accPromise;
-        const detailedPlaces = await Promise.all(
-          optimalPaths[key].map(async (place) => {
-            const details = await this.getPlaceDetails(place.place_id);
-            return {
-              ...place,
-              details,
-            };
-          }),
-        );
-        acc[key] = detailedPlaces;
-        return acc;
-      },
-      Promise.resolve({}),
-    );
-
-    const planDetail = {
-      userID: userID,
-      date_range,
-      startPlaceId: startPlaceId,
-      startLocation: {
+      const startPlace = {
+        place_id: startPlaceId,
         lat: lat,
         lng: lng,
-      },
-      types: types,
-      placeList: detailedOptimalPaths,
-    };
+        visitTime: 0,
+      };
 
-    return planDetail;
+      await Promise.all(placesPromises);
+
+      const optimalPaths = await this.findOptimalPathsForDays(
+        draftPlaceList,
+        startPlace,
+        totalDates,
+        timeLimitperDay,
+        startDate,
+      );
+
+      const detailedOptimalPaths = await Object.keys(optimalPaths).reduce(
+        async (accPromise, key) => {
+          const acc = await accPromise;
+          const detailedPlaces = await Promise.all(
+            optimalPaths[key].map(async (place) => {
+              const details = await this.getPlaceDetails(place.place_id);
+              return {
+                ...place,
+                details,
+              };
+            }),
+          );
+          acc[key] = detailedPlaces;
+          return acc;
+        },
+        Promise.resolve({}),
+      );
+
+      const planDetail = {
+        userID: userID,
+        date_range,
+        startPlaceId: startPlaceId,
+        startLocation: {
+          lat: lat,
+          lng: lng,
+        },
+        types: types,
+        placeList: detailedOptimalPaths,
+      };
+
+      return planDetail;
+    } catch (error) {
+      console.error("Error when get Itinerary ",error);
+      throw new HttpException(
+        'Error when get itinerary',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
   }
 
   async findOptimalPathsForDays(
@@ -779,28 +795,51 @@ export class GooglemapsPlaceService {
     timeLimitperDay,
     startDate,
   ) {
-    const optimalPaths = {};
-    let currentDate = new Date(startDate);
-    for (let i = 0; i <= numDays; i++) {
-      const optimalPath = await this.nearestNeighborTSPForDay(
-        places,
-        startPlace,
-        timeLimitperDay,
-        currentDate,
-      );
-      optimalPaths[currentDate.toISOString()] = optimalPath;
-      // Remove chosen places from places object
-      optimalPath.forEach((node) => {
-        if (node.type !== 'start') {
-          places[node.type] = places[node.type].filter(
-            (place) => place.name !== node.name,
-          );
+    try {
+      const optimalPaths = {};
+      let currentDate = new Date(startDate);
+      for (let i = 0; i <= numDays; i++) {
+        // Kiểm tra loại địa điểm nào không còn địa điểm nào để chọn
+        const availablePlaces = Object.keys(places).reduce((acc, key) => {
+          if (places[key].length > 0) {
+            acc[key] = places[key];
+          }
+          return acc;
+        }, {});
+
+        // Nếu không còn địa điểm nào khả dụng, thoát khỏi vòng lặp
+        if (Object.keys(availablePlaces).length === 0) {
+          break;
         }
-      });
-      currentDate.setDate(currentDate.getDate() + 1);
+        console.log("Place", i, availablePlaces)
+        const optimalPath = await this.nearestNeighborTSPForDay(
+          availablePlaces,
+          startPlace,
+          timeLimitperDay,
+          currentDate,
+        );
+        optimalPaths[currentDate.toISOString()] = optimalPath;
+
+        // Loại bỏ các địa điểm đã được chọn khỏi `places`
+        optimalPath.forEach((node) => {
+          if (node.type !== 'start') {
+            places[node.type] = places[node.type].filter(
+              (place) => place.place_id !== node.place_id,
+            );
+          }
+        });
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      return optimalPaths;
+    } catch (err) {
+      console.error("Error while findOptimalPathsForDays" + err.message);
+      throw new HttpException(
+        'Error fetching places',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-    return optimalPaths;
   }
+
   async nearestNeighborTSPForDay(
     places,
     startPlace,
@@ -825,12 +864,9 @@ export class GooglemapsPlaceService {
     let currentTime = 0;
     let dayOrder = 0;
     let lastVisitedType = null;
-    function removeVisitedPlace(type, name) {
-      nodes[type] = nodes[type].filter((node) => node.name !== name);
-    }
+
     while (currentTime < timeLimitperDay) {
       if (current.type !== 'start') {
-        // Skip adding start place to the path
         const startTime = await this.convertMinutesToTime(currentTime);
         const endTime = await this.convertMinutesToTime(
           currentTime + current.visitTime,
@@ -843,21 +879,17 @@ export class GooglemapsPlaceService {
           position: dayOrder,
           currentDate: currentDate.toISOString(),
         });
-        currentTime += current.visitTime; // Add visit time for the current place
+        currentTime += current.visitTime;
       }
 
       let nearest = null;
       let minTravelTime = Number.MAX_SAFE_INTEGER;
-
-      // Rotate through types to ensure no two consecutive places have the same type
       let nextTypes = types.filter((type) => type !== lastVisitedType);
-      console.log('Next types: ' + nextTypes);
-      // If no available type is found, reset the list of available types
+
       if (nextTypes.length === 0) {
         nextTypes = types.filter((type) => type !== lastVisitedType);
       }
-      console.log('types', types);
-      // Find the nearest unvisited node that fits within the time limit and is a different type
+
       for (const type of nextTypes) {
         for (let i = 0; i < nodes[type].length; i++) {
           const nextNode = nodes[type][i];
@@ -875,26 +907,29 @@ export class GooglemapsPlaceService {
       }
 
       if (nearest === null) {
-        break; // No more nodes can be visited within the time limit
+        break;
       }
 
-      current = { ...nearest, position: dayOrder }; // Move to the nearest unvisited node
-      currentTime += minTravelTime; // Add travel time to the current time
-      removeVisitedPlace(nearest.type, nearest.name); // Remove visited place from places
+      current = { ...nearest, position: dayOrder };
+      currentTime += minTravelTime;
+      nodes[nearest.type] = nodes[nearest.type].filter(
+        (node) => node.place_id !== nearest.place_id,
+      );
       dayOrder++;
     }
-    console.log('Path ', path);
     return path;
+
+
   }
   async travelTime(point1, point2) {
     const dist = Math.sqrt(
       Math.pow(point1.lat - point2.lat, 2) +
-        Math.pow(point1.lng - point2.lng, 2),
+      Math.pow(point1.lng - point2.lng, 2),
     );
     return dist * 10;
   }
   async convertMinutesToTime(minutes) {
-    const hours = Math.floor(minutes / 60) + 6; // Starting from 6 AM
+    const hours = Math.floor(minutes / 60) + 6;
     const mins = Math.floor(minutes % 60);
     const secs = Math.floor((minutes - Math.floor(minutes)) * 60);
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;

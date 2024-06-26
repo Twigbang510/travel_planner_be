@@ -269,9 +269,9 @@ export class GooglemapsPlaceService {
     if (localCurrentDate <= totalDates) {
       travelTime = previousPlaceId
         ? (await this.calculateTravelTime(
-          previousPlaceId,
-          bestPlace.place_id,
-        )) / 60
+            previousPlaceId,
+            bestPlace.place_id,
+          )) / 60
         : 0;
       previousPlaceId = bestPlace.place_id;
       firstTime = false;
@@ -694,7 +694,6 @@ export class GooglemapsPlaceService {
       const totalDates =
         (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
       const timeLimitperDay = (20 - 6) * 60;
-      const placeList: { [key: string]: any[] } = {};
       const nextPageToken: { [key: string]: string } = {};
       const placesPromises: Promise<void>[] = [];
 
@@ -779,13 +778,12 @@ export class GooglemapsPlaceService {
 
       return planDetail;
     } catch (error) {
-      console.error("Error when get Itinerary ",error);
+      console.error('Error when get Itinerary ', error);
       throw new HttpException(
         'Error when get itinerary',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
   }
 
   async findOptimalPathsForDays(
@@ -799,7 +797,6 @@ export class GooglemapsPlaceService {
       const optimalPaths = {};
       let currentDate = new Date(startDate);
       for (let i = 0; i <= numDays; i++) {
-        // Kiểm tra loại địa điểm nào không còn địa điểm nào để chọn
         const availablePlaces = Object.keys(places).reduce((acc, key) => {
           if (places[key].length > 0) {
             acc[key] = places[key];
@@ -807,11 +804,10 @@ export class GooglemapsPlaceService {
           return acc;
         }, {});
 
-        // Nếu không còn địa điểm nào khả dụng, thoát khỏi vòng lặp
         if (Object.keys(availablePlaces).length === 0) {
           break;
         }
-        console.log("Place", i, availablePlaces)
+        console.log('Place', i, availablePlaces);
         const optimalPath = await this.nearestNeighborTSPForDay(
           availablePlaces,
           startPlace,
@@ -820,7 +816,6 @@ export class GooglemapsPlaceService {
         );
         optimalPaths[currentDate.toISOString()] = optimalPath;
 
-        // Loại bỏ các địa điểm đã được chọn khỏi `places`
         optimalPath.forEach((node) => {
           if (node.type !== 'start') {
             places[node.type] = places[node.type].filter(
@@ -832,7 +827,7 @@ export class GooglemapsPlaceService {
       }
       return optimalPaths;
     } catch (err) {
-      console.error("Error while findOptimalPathsForDays" + err.message);
+      console.error('Error while findOptimalPathsForDays' + err.message);
       throw new HttpException(
         'Error fetching places',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -859,6 +854,7 @@ export class GooglemapsPlaceService {
         visitTime: this.averageVisitTimes[type],
       }));
     });
+
     const path = [];
     let current = { ...startPlace, type: 'start' };
     let currentTime = 0;
@@ -917,17 +913,18 @@ export class GooglemapsPlaceService {
       );
       dayOrder++;
     }
+
     return path;
-
-
   }
+
   async travelTime(point1, point2) {
     const dist = Math.sqrt(
       Math.pow(point1.lat - point2.lat, 2) +
-      Math.pow(point1.lng - point2.lng, 2),
+        Math.pow(point1.lng - point2.lng, 2),
     );
     return dist * 10;
   }
+
   async convertMinutesToTime(minutes) {
     const hours = Math.floor(minutes / 60) + 6;
     const mins = Math.floor(minutes % 60);

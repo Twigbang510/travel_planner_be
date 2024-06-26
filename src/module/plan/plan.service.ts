@@ -22,20 +22,30 @@ export class PlanService {
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
     const transaction = await this.planModel.sequelize.transaction();
     try {
-      const { userId, date_range, startPlaceId, startLocation, types, placeList } = createPlanDto;
+      const {
+        userId,
+        date_range,
+        startPlaceId,
+        startLocation,
+        types,
+        placeList,
+      } = createPlanDto;
       const user = await this.userModel.findByPk(userId);
       if (!user) {
         throw new Error('User not found');
       }
-      const plan = await this.planModel.create({
-        userId,
-        startDate: date_range[0],
-        endDate: date_range[1],
-        startPlaceId,
-        startLocation,
-        types,
-      }, { transaction });
-  
+      const plan = await this.planModel.create(
+        {
+          userId,
+          startDate: date_range[0],
+          endDate: date_range[1],
+          startPlaceId,
+          startLocation,
+          types,
+        },
+        { transaction },
+      );
+
       for (const [date, places] of Object.entries(placeList)) {
         for (const placeWithDetails of places) {
           const placeData = placeWithDetails.details;
@@ -48,7 +58,7 @@ export class PlanService {
             position: placeWithDetails.position,
             currentDate: placeWithDetails.currentDate,
           };
-  
+
           let place = await this.placeModel.findOne({
             where: { place_id: placeData.place_id },
             transaction,
@@ -56,15 +66,18 @@ export class PlanService {
           if (!place) {
             place = await this.placeModel.create(placeData, { transaction });
           }
-  
-          await this.planPlaceDetailModel.create({
-            ...placeDetailData,
-            placeId: place.id,
-            planId: plan.id,
-          }, { transaction });
+
+          await this.planPlaceDetailModel.create(
+            {
+              ...placeDetailData,
+              placeId: place.id,
+              planId: plan.id,
+            },
+            { transaction },
+          );
         }
       }
-  
+
       await transaction.commit();
       return plan;
     } catch (error) {
@@ -109,17 +122,17 @@ export class PlanService {
           },
         ],
       });
-  
+
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
-  
+
       const planDetails = plan.planPlaceDetails.reduce((acc, detail) => {
         const date = new Date(detail.currentDate).toISOString();
         if (!acc[date]) {
           acc[date] = [];
         }
-  
+
         acc[date].push({
           type: detail.type,
           place_id: detail.place.place_id,
@@ -142,10 +155,10 @@ export class PlanService {
             website: detail.place.website,
           },
         });
-  
+
         return acc;
       }, {});
-  
+
       const result = {
         userId: plan.userId,
         date_range: [plan.startDate, plan.endDate],
@@ -154,15 +167,16 @@ export class PlanService {
         types: plan.types,
         placeList: planDetails,
       };
-  
+
       return result;
     } catch (error) {
       console.error('Error when fetching Plan by id', error);
-      throw new NotFoundException('Could not fetch Plan. Please try again later.');
+      throw new NotFoundException(
+        'Could not fetch Plan. Please try again later.',
+      );
     }
   }
-  
-  
+
   public async exportPlan(planId: number): Promise<void> {
     try {
       const plan = await this.planModel.findOne({
@@ -197,14 +211,15 @@ export class PlanService {
   async update(id: number, updatePlanDto: UpdatePlanDto): Promise<Plan> {
     const transaction = await this.planModel.sequelize.transaction();
     try {
-      const { userId, date_range, startPlaceId, types, placeList } = updatePlanDto;
-  
+      const { userId, date_range, startPlaceId, types, placeList } =
+        updatePlanDto;
+
       // Check if user exists
       const user = await this.userModel.findByPk(userId);
       if (!user) {
         throw new NotFoundException('User not found');
       }
-  
+
       const plan = await this.planModel.findByPk(id, { transaction });
       if (!plan) {
         throw new NotFoundException('Plan not found');
@@ -215,11 +230,14 @@ export class PlanService {
       plan.startPlaceId = startPlaceId;
       plan.types = types;
       await plan.save({ transaction });
-  
+
       // Update places and place details
       if (placeList) {
-        await this.planPlaceDetailModel.destroy({ where: { planId: plan.id }, transaction });
-  
+        await this.planPlaceDetailModel.destroy({
+          where: { planId: plan.id },
+          transaction,
+        });
+
         for (const [date, places] of Object.entries(placeList)) {
           for (const placeWithDetails of places) {
             const placeData = placeWithDetails.details;
@@ -232,7 +250,7 @@ export class PlanService {
               position: placeWithDetails.position,
               currentDate: placeWithDetails.currentDate,
             };
-  
+
             let place = await this.placeModel.findOne({
               where: { place_id: placeData.place_id },
               transaction,
@@ -240,16 +258,19 @@ export class PlanService {
             if (!place) {
               place = await this.placeModel.create(placeData, { transaction });
             }
-  
-            await this.planPlaceDetailModel.create({
-              ...placeDetailData,
-              placeId: place.id,
-              planId: plan.id,
-            }, { transaction });
+
+            await this.planPlaceDetailModel.create(
+              {
+                ...placeDetailData,
+                placeId: place.id,
+                planId: plan.id,
+              },
+              { transaction },
+            );
           }
         }
       }
-  
+
       await transaction.commit();
       return plan;
     } catch (error) {

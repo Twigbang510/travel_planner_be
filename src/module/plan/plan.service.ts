@@ -22,7 +22,7 @@ export class PlanService {
   async create(createPlanDto: CreatePlanDto): Promise<Plan> {
     const transaction = await this.planModel.sequelize.transaction();
     try {
-      const { userId, date_range, startPlaceId, types, placeList } = createPlanDto;
+      const { userId, date_range, startPlaceId, startLocation, types, placeList } = createPlanDto;
       const user = await this.userModel.findByPk(userId);
       if (!user) {
         throw new Error('User not found');
@@ -32,6 +32,7 @@ export class PlanService {
         startDate: date_range[0],
         endDate: date_range[1],
         startPlaceId,
+        startLocation,
         types,
       }, { transaction });
   
@@ -98,7 +99,7 @@ export class PlanService {
     }
   }
 
-  async getPlanById(planId: number): Promise<Plan> {
+  async getPlanById(planId: number): Promise<any> {
     try {
       const plan = await this.planModel.findByPk(planId, {
         include: [
@@ -108,19 +109,60 @@ export class PlanService {
           },
         ],
       });
-
+  
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
-
-      return plan;
+  
+      const planDetails = plan.planPlaceDetails.reduce((acc, detail) => {
+        const date = new Date(detail.currentDate).toISOString();
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+  
+        acc[date].push({
+          type: detail.type,
+          place_id: detail.place.place_id,
+          lat: detail.place.geometry.location.lat,
+          lng: detail.place.geometry.location.lng,
+          score: detail.place.rating || 0,
+          visitTime: detail.averageTime,
+          position: detail.indexOfDate,
+          fromTime: detail.fromTime,
+          nextTime: detail.nextTime,
+          currentDate: detail.currentDate,
+          details: {
+            formatted_address: detail.place.formatted_address,
+            geometry: detail.place.geometry,
+            name: detail.place.name,
+            photos: detail.place.photos,
+            place_id: detail.place.place_id,
+            rating: detail.place.rating,
+            user_ratings_total: detail.place.user_ratings_total,
+            website: detail.place.website,
+          },
+        });
+  
+        return acc;
+      }, {});
+  
+      const result = {
+        userId: plan.userId,
+        date_range: [plan.startDate, plan.endDate],
+        startPlaceId: plan.startPlaceId,
+        startLocation: plan.startLocation,
+        types: plan.types,
+        placeList: planDetails,
+      };
+  
+      return result;
     } catch (error) {
       console.error('Error when fetching Plan by id', error);
-      throw new NotFoundException(
-        'Could not fetch Plan. Please try again later.',
-      );
+      throw new NotFoundException('Could not fetch Plan. Please try again later.');
     }
   }
+  
+  
   public async exportPlan(planId: number): Promise<void> {
     try {
       const plan = await this.planModel.findOne({

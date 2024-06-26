@@ -3,16 +3,10 @@ import { PlanPlaceDetail } from '../../plan/entities/plan-detail.entity';
 
 @Table
 export class Place extends Model<Place> {
-  @Column({
-    type: DataType.STRING,
-    allowNull: false,
-  })
+  @Column({ type: DataType.STRING, allowNull: false })
   formatted_address: string;
 
-  @Column({
-    type: DataType.JSON,
-    allowNull: false,
-  })
+  @Column({ type: DataType.JSON, allowNull: false })
   geometry: {
     location: {
       lat: number;
@@ -30,40 +24,22 @@ export class Place extends Model<Place> {
     };
   };
 
-  @Column({
-    type: DataType.STRING,
-    allowNull: false,
-  })
+  @Column({ type: DataType.STRING, allowNull: false })
   name: string;
 
-  @Column({
-    type: DataType.JSON,
-    allowNull: false,
-  })
+  @Column({ type: DataType.JSON, allowNull: false })
   photos: string[];
 
-  @Column({
-    type: DataType.STRING,
-    allowNull: false,
-  })
+  @Column({ type: DataType.STRING, allowNull: false })
   place_id: string;
 
-  @Column({
-    type: DataType.FLOAT,
-    allowNull: true,
-  })
+  @Column({ type: DataType.FLOAT, allowNull: true })
   rating?: number;
 
-  @Column({
-    type: DataType.INTEGER,
-    allowNull: true,
-  })
+  @Column({ type: DataType.INTEGER, allowNull: true })
   user_ratings_total?: number;
 
-  @Column({
-    type: DataType.STRING,
-    allowNull: true,
-  })
+  @Column({ type: DataType.STRING, allowNull: true })
   website?: string;
 
   @HasMany(() => PlanPlaceDetail)

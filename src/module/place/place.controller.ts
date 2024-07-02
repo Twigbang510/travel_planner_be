@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { PlaceService } from './place.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
-
+import { UserData } from 'src/decorators/user-data.decorator';
+import { JwtAuthGuard } from 'src/middleware/guard/jwt-auth.guard';
+@UseGuards(JwtAuthGuard)
 @Controller('place')
 export class PlaceController {
   constructor(private readonly placeService: PlaceService) {}
@@ -18,6 +21,14 @@ export class PlaceController {
   @Post('save')
   create(@Body() createPlaceDto: CreatePlaceDto) {
     return this.placeService.create(createPlaceDto);
+  }
+
+  @Post('like')
+  async toggleFavoritePlace(
+    @Body('placeId') placeId: string,
+    @UserData('id') userId: number
+  ): Promise<{ liked: boolean }> {
+    return this.placeService.toggleFavoritePlace(placeId, userId);
   }
 
   @Get()

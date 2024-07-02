@@ -46,5 +46,4 @@ export class GooglemapsPlaceController {
   ): Promise<any> {
     return this.googlemapsPlaceService.getItinerary(nearbySearchDto, user.id);
   }
-
 }

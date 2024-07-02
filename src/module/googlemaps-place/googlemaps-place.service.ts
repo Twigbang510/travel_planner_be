@@ -9,6 +9,8 @@ import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
 import { sleep } from 'src/utils/helpers';
 
+
+
 @Injectable()
 export class GooglemapsPlaceService {
   private googleMapsClient: Client;
@@ -119,8 +121,10 @@ export class GooglemapsPlaceService {
     nightlife: ['bar', 'night_club', 'casino'],
     food: ['restaurant', 'cafe', 'bakery', 'food'],
   };
+
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
+    this.client = new LanguageServiceClient();
   }
 
   /**
@@ -163,7 +167,6 @@ export class GooglemapsPlaceService {
           key: this.configService.googleMapsKey,
         },
       });
-
       return response.data.predictions.map((prediction) => ({
         description: prediction.description,
         place_id: prediction.place_id,
@@ -481,6 +484,7 @@ export class GooglemapsPlaceService {
       }
 
       return placeDetails;
+
     } catch (error) {
       console.error(error.message);
       throw new HttpException(
@@ -489,6 +493,16 @@ export class GooglemapsPlaceService {
       );
     }
   }
+  async analyzeTextSentiment(text: string): Promise<any> {
+    const document: protos.google.cloud.language.v1.Document = {
+      language: 'en',
+      content: text,
+      type: protos.google.cloud.language.v1.Document.Type.PLAIN_TEXT,
+      toJSON: function (): { [k: string]: any; } {
+        throw new Error('Function not implemented.');
+      }
+    };
+
 
   /**
    * Get details for a specific place.
@@ -561,7 +575,6 @@ export class GooglemapsPlaceService {
       types.forEach((key) => {
         positions[key] = 0;
       });
-
       while (localCurrentDate <= totalDates) {
         const fetchPromises = types.map(async (key) => {
           const array = this.placeTypes[key];

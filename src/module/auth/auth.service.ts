@@ -52,12 +52,21 @@ export class AuthService {
     });
   }
 
-  async login({ email, password }: LoginUserDto): Promise<string> {
+  async login({ email, password }: LoginUserDto): Promise<any> {
     const checkUser: boolean = await this.validateUser({ email, password });
     if (!checkUser) throw new UnauthorizedException();
 
     const userData: User = await this.userService.findOneByEmail(email);
-
-    return await this.tokenService.getToken(userData.id);
+    const token = await this.tokenService.getToken(userData.id);
+    const userResponse = {
+      userData: {
+        userId: userData.id,
+        username: userData.username,
+        email: userData.email,
+        picture: userData.picture,
+      },
+      token: token,
+    };
+    return userResponse;
   }
 }

@@ -2,8 +2,10 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Client } from '@googlemaps/google-maps-services-js';
 import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
+
 import { PredictionServiceClient } from '@google-cloud/aiplatform';
 import { SentimentResult } from './interface/sentimen-result.interface';
+
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -12,8 +14,10 @@ export class GooglemapsPlaceService {
   private language = require('@google-cloud/language');
   private client = new this.language.LanguageServiceClient();
 
+
   constructor(private configService: AppConfigService) {
     this.googleMapsClient = new Client({});
+    this.client = new LanguageServiceClient();
   }
 
   async getBestPlace(results: SentimentResult[]): Promise<{ place_id: string; score: number; }> {
@@ -42,7 +46,6 @@ export class GooglemapsPlaceService {
           ],
         },
       });
-      console.log(response.data.result);
       return response.data.result;
     } catch (error) {
       console.log(error.message);
@@ -53,8 +56,10 @@ export class GooglemapsPlaceService {
     }
   }
 
+
   async getNearbyPlaces(nearbySearchDto: NearbySearchDto) {
     const { lat, lng, types, date_range, radius = 1500 } = nearbySearchDto;
+
     try {
       const response = await this.googleMapsClient.placesNearby({
         params: {
@@ -64,6 +69,7 @@ export class GooglemapsPlaceService {
           key: this.configService.googleMapsKey,
         },
       });
+
       const place_reviews = await Promise.all(
         response.data.results.map(async (place) => {
           const reviews = await this.getPlaceReviews(place.place_id);
@@ -79,6 +85,7 @@ export class GooglemapsPlaceService {
       const bestPlace = await this.getBestPlace(review_scoure)
       console.log(bestPlace)
       return place_reviews;
+
     } catch (error) {
       console.error(error.response?.data || error.message);
       throw new HttpException(
@@ -96,8 +103,10 @@ export class GooglemapsPlaceService {
           key: this.configService.googleMapsKey,
         },
       });
+
       const reviews = response.data.result.reviews || [];
       return reviews.length ? { place_id: placeId, reviews } : null;
+
     } catch (error) {
       console.error(error.response?.data || error.message);
       throw new HttpException(
@@ -106,6 +115,16 @@ export class GooglemapsPlaceService {
       );
     }
   }
+  async analyzeTextSentiment(text: string): Promise<any> {
+    const document: protos.google.cloud.language.v1.Document = {
+      language: 'en',
+      content: text,
+      type: protos.google.cloud.language.v1.Document.Type.PLAIN_TEXT,
+      toJSON: function (): { [k: string]: any; } {
+        throw new Error('Function not implemented.');
+      }
+    };
+
 
   async analyzeSentiment(reviews: { place_id: string, reviews: { text: string; }[] }): Promise<SentimentResult> {
     const text = reviews.reviews.map((review) => review.text).join('\n');
@@ -119,13 +138,12 @@ export class GooglemapsPlaceService {
       });
       const sentiment = result.documentSentiment;
       return { place_id: reviews.place_id, score: sentiment.score };
+
     } catch (error) {
-      console.error(error);
-      throw new HttpException(
-        'Error analyzing sentiment',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Error analyzing sentiment', error);
+      throw error;
     }
   }
+
 
 }

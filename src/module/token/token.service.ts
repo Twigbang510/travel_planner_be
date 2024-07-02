@@ -9,15 +9,15 @@ export class TokenService {
     private jwtService: JwtService,
     private configService: AppConfigService,
   ) {}
-  async signJWTToken({ id, duration }: JwtPayload):Promise<string> {
+  async signJWTToken({ id, duration }: JwtPayload): Promise<string> {
     const token = this.jwtService.sign(
       {
         id,
         expiresIn: duration,
       },
       {
-        secret: this.configService.jwtSecretKey
-      }
+        secret: this.configService.jwtSecretKey,
+      },
     );
     return token;
   }

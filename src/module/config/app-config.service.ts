@@ -50,4 +50,20 @@ export class AppConfigService {
   get jwtDuration(): string {
     return this.configService.get<string>('JWT_DURATION');
   }
+
+  get googleMapsKey(): string {
+    return this.configService.get<string>('GOOGLE_MAPS_KEY');
+  }
+
+  get googleProjectId(): string {
+    return this.configService.get<string>('GOOGLE_PROJECT_ID');
+  }
+
+  get googleLocation(): string {
+    return this.configService.get<string>('GOOGLE_LOCATION');
+  }
+
+  get googleEndpointId(): string {
+    return this.configService.get<string>('GOOGLE_ENDPOINT_ID');
+  }
 }

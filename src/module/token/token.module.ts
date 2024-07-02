@@ -18,7 +18,7 @@ import { JwtStrategy } from '../auth/strategies/jwt.strategy';
       inject: [AppConfigService],
     }),
   ],
-  providers: [JwtStrategy,AppConfigService, TokenService],
-  exports: [TokenService]
+  providers: [JwtStrategy, AppConfigService, TokenService],
+  exports: [TokenService],
 })
 export class TokenModule {}

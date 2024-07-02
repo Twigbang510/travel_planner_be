@@ -37,9 +37,9 @@ export class UserController {
   async findOne(@UserData('id') id: string): Promise<User> {
     if (!id) throw new BadRequestException('User not found');
     const user = await this.userService.findOneById(id);
-    delete user.password
+    delete user.password;
 
-    return user
+    return user;
   }
 
   @Patch(':id')

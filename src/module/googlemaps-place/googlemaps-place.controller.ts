@@ -19,10 +19,10 @@ export class GooglemapsPlaceController {
     return this.googlemapsPlaceService.getNearbyPlaces(nearbySearchDto);
   }
 
+
   @Post('sentiment')
   getSentimen(@Body() text: string): Promise<any> {
     console.log(text)
     return this.googlemapsPlaceService.analyzeTextSentiment(text);
   }
-
 }

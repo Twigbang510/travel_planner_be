@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsOptional } from 'class-validator';
+import { IsNumber, IsString, IsOptional,ArrayNotEmpty, IsDateString } from 'class-validator';
 
 export class NearbySearchDto {
   @IsNumber()
@@ -8,10 +8,13 @@ export class NearbySearchDto {
   lng: number;
 
   @IsOptional()
-  @IsString()
-  type?: string;
-
-  @IsOptional()
   @IsNumber()
   radius?: number;
+
+  @ArrayNotEmpty()
+  types: string;
+
+  @IsDateString({}, { each: true })
+  date_range: Date[];
+
 }

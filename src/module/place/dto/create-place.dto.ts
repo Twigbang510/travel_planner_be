@@ -4,6 +4,7 @@ import {
   IsArray,
   ValidateNested,
   IsObject,
+  IsOptional
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -35,21 +36,6 @@ class GeometryDto {
   viewport: ViewportDto;
 }
 
-class PhotoDto {
-  @IsNumber()
-  height: number;
-
-  @IsArray()
-  @IsString({ each: true })
-  html_attributions: string[];
-
-  @IsString()
-  photo_reference: string;
-
-  @IsNumber()
-  width: number;
-}
-
 export class CreatePlaceDto {
   @IsString()
   formatted_address: string;
@@ -62,19 +48,21 @@ export class CreatePlaceDto {
   name: string;
 
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PhotoDto)
-  photos: PhotoDto[];
+  @IsString({ each: true })
+  photos: string[];
 
   @IsString()
   place_id: string;
 
+  @IsOptional()
   @IsNumber()
-  rating: number;
+  rating?: number;
 
+  @IsOptional()
   @IsNumber()
-  user_ratings_total: number;
+  user_ratings_total?: number;
 
+  @IsOptional()
   @IsString()
-  website: string;
+  website?: string;
 }

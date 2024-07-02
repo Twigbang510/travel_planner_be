@@ -15,10 +15,10 @@ import { UpdatePlaceDto } from './dto/update-place.dto';
 export class PlaceController {
   constructor(private readonly placeService: PlaceService) {}
 
-  // @Post('save')
-  // create(@Body() createPlaceDto: CreatePlaceDto) {
-  //   return this.placeService.create(createPlaceDto);
-  // }
+  @Post('save')
+  create(@Body() createPlaceDto: CreatePlaceDto) {
+    return this.placeService.create(createPlaceDto);
+  }
 
   @Get()
   findAll() {

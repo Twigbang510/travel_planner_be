@@ -39,6 +39,13 @@ export class PlaceService {
     }
   }
 
+  async getFavorite(placeId: string, userId: number): Promise<boolean> {
+    const favorite = await this.userFavoritePlaceModel.findOne({
+      where: { userId, placeId },
+    });
+    return !!favorite;
+  }
+  
   findAll() {
     return this.placeModel.findAll();
   }

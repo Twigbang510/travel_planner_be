@@ -8,6 +8,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { NearbySearchDto } from './dto/nearby-search.dto';
 import { SentimentResult } from './interface/sentiment-result.interface';
 import { sleep } from 'src/utils/helpers';
+import { PlaceService } from '../place/place.service';
 
 @Injectable()
 export class GooglemapsPlaceService {
@@ -16,7 +17,6 @@ export class GooglemapsPlaceService {
   private client = new this.language.LanguageServiceClient();
   private startTime = new Date().setHours(6, 0, 0, 0);
   private endTime = new Date().setHours(20, 0, 0, 0);
-
   private readonly averageVisitTimes = {
     accounting: 30,
     airport: 120,
@@ -119,7 +119,10 @@ export class GooglemapsPlaceService {
     nightlife: ['bar', 'night_club', 'casino'],
     food: ['restaurant', 'cafe', 'bakery', 'food'],
   };
-  constructor(private configService: AppConfigService) {
+  constructor(
+    private configService: AppConfigService,
+    private placeService: PlaceService
+  ) {
     this.googleMapsClient = new Client({});
   }
 
@@ -752,9 +755,14 @@ export class GooglemapsPlaceService {
           const detailedPlaces = await Promise.all(
             optimalPaths[key].map(async (place) => {
               const details = await this.getPlaceDetails(place.place_id);
+              const liked = await this.placeService.getFavorite(
+                place.place_id,
+                +userID,
+              );
               return {
                 ...place,
                 details,
+                liked
               };
             }),
           );

@@ -39,6 +39,9 @@ export class Plan extends Model {
   @Column({ type: DataType.JSON, allowNull: false })
   types: string[];
 
+  @Column({ type: DataType.STRING, allowNull: true })
+  city: string;
+  
   @HasMany(() => PlanPlaceDetail)
   planPlaceDetails: PlanPlaceDetail[];
 }

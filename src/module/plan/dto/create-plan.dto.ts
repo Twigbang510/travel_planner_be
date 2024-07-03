@@ -50,6 +50,7 @@ export class CreatePlanDto {
     lng: number;
   };
   types: string[];
+  city: string;
   placeList: {
     [key: string]: Array<{
       type: string;

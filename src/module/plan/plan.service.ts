@@ -28,6 +28,7 @@ export class PlanService {
         startPlaceId,
         startLocation,
         types,
+        city,
         placeList,
       } = createPlanDto;
       const user = await this.userModel.findByPk(userId);
@@ -42,6 +43,7 @@ export class PlanService {
           startPlaceId,
           startLocation,
           types,
+          city
         },
         { transaction },
       );
@@ -165,6 +167,7 @@ export class PlanService {
         startPlaceId: plan.startPlaceId,
         startLocation: plan.startLocation,
         types: plan.types,
+        city: plan.city,
         placeList: planDetails,
       };
 

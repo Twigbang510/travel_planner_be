@@ -1,11 +1,18 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { GoogleSheetsService } from './google-sheet.service';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('google-sheets')
 @Controller('google-sheets')
 export class GoogleSheetsController {
   constructor(private readonly googleSheetsService: GoogleSheetsService) {}
 
   @Post('create-spreadsheet')
+  @ApiOperation({ summary: 'Create a new Google Spreadsheet' })
+  @ApiResponse({
+    status: 201,
+    description: 'Spreadsheet created successfully.',
+  })
   async createSpreadsheet(
     @Body() createSpreadsheetDto: { title: string; data: any },
   ) {
@@ -18,6 +25,7 @@ export class GoogleSheetsController {
   }
 
   @Post('create-sheet')
+  @ApiOperation({ summary: 'Create a new sheet in an existing spreadsheet' })
   async createSheet(
     @Body() createSheetDto: { spreadsheetId: string; sheetTitle: string },
   ) {
@@ -26,6 +34,7 @@ export class GoogleSheetsController {
   }
 
   @Post('append-data')
+  @ApiOperation({ summary: 'Append data to a sheet' })
   async appendData(
     @Body()
     appendDataDto: {
@@ -39,6 +48,7 @@ export class GoogleSheetsController {
   }
 
   @Post('share-spreadsheet')
+  @ApiOperation({ summary: 'Share a spreadsheet with a user' })
   async shareSpreadsheet(
     @Body() shareSpreadsheetDto: { spreadsheetId: string; email: string },
   ) {
@@ -47,6 +57,7 @@ export class GoogleSheetsController {
   }
 
   @Post('set-spreadsheet-public')
+  @ApiOperation({ summary: 'Set a spreadsheet to be publicly accessible' })
   async setSpreadsheetPublic(
     @Body() setSpreadsheetPublicDto: { spreadsheetId: string },
   ) {

@@ -7,6 +7,7 @@ import { Place } from '../place/entities/place.entity';
 import { PlanPlaceDetail } from './entities/plan-detail.entity';
 import { User } from '../user/entities/user.entity';
 import { GoogleSheetsService } from '../google-sheet/google-sheet.service';
+import { waitForDebugger } from 'inspector';
 
 @Injectable()
 export class PlanService {
@@ -91,6 +92,10 @@ export class PlanService {
 
   async getPlansByUserId(userId: number): Promise<Plan[]> {
     try {
+      const users = await this.userModel.findByPk(userId);
+      if (!users) {
+        throw new NotFoundException('User not found');
+      }
       const plans = await this.planModel.findAll({
         where: { userId: userId },
         include: [

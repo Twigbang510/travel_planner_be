@@ -8,15 +8,19 @@ import {
   Delete,
   UsePipes,
   ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { PlanService } from './plan.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { Plan } from './entities/plan.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/middleware/guard/jwt-auth.guard';
+import { UserData } from 'src/decorators/user-data.decorator';
 
 @ApiTags('plan')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('plan')
 export class PlanController {
   constructor(private readonly planService: PlanService) {}
@@ -28,10 +32,10 @@ export class PlanController {
     return this.planService.create(createPlanDto);
   }
 
-  @Get('/user/:userId')
+  @Get('/user')
   @ApiOperation({ summary: 'Retrieve plans by user ID' })
-  async getPlansByUserId(@Param('userId') userId: number): Promise<Plan[]> {
-    return this.planService.getPlansByUserId(userId);
+  async getPlansByUserId(@UserData('id') id: number): Promise<Plan[]> {
+    return this.planService.getPlansByUserId(id);
   }
 
   @Get('/:planId')

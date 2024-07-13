@@ -110,6 +110,8 @@ export class GooglemapsPlaceService {
     veterinary_care: 60,
     zoo: 180,
   };
+  private sentimentAnalysis: any;
+
   private readonly placeTypes = {
     outdoor: ['zoo', 'aquarium', 'cafe', 'bowling_alley'],
     art: ['art_gallery'],
@@ -124,7 +126,14 @@ export class GooglemapsPlaceService {
     private placeService: PlaceService
   ) {
     this.googleMapsClient = new Client({});
+    this.initializeSentimentAnalysis();
   }
+
+  private async initializeSentimentAnalysis() {
+    const TransformersApi = Function('return import("@xenova/transformers")')();
+    const { pipeline } = await TransformersApi;
+    this.sentimentAnalysis = await pipeline('sentiment-analysis','Xenova/bert-base-multilingual-uncased-sentiment');
+}
 
   /**
    * Format time to 'HH:mm:ss' string.
@@ -357,16 +366,35 @@ export class GooglemapsPlaceService {
   private async analyzeSentiment(reviews: {
     place_id: string;
     reviews: { text: string }[];
-  }): Promise<SentimentResult> {
-    const text = reviews.reviews.map((review) => review.text).join('\n');
-    const [result] = await this.client.analyzeSentiment({
-      document: { content: text, type: 'PLAIN_TEXT' },
-    });
+}): Promise<any> {
+    console.log(reviews.reviews);
+    let totalStars = 0;
+    let totalCount = 0;
+
+    for (const review of reviews.reviews) {
+        const result = await this.sentimentAnalysis(review.text);
+        console.log(result);
+        if (result.length > 0) {
+            const sentimentScore = result[0].score;
+            const sentimentLabel = result[0].label;
+
+            // Extract the numeric rating from the sentiment label
+            const match = sentimentLabel.match(/(\d) stars/);
+            if (match) {
+                const stars = parseInt(match[1], 10);
+                totalStars += stars;
+                totalCount += 1;
+            }
+        }
+    }
+
+    const averageStars = totalStars / totalCount;
     return {
-      place_id: reviews.place_id,
-      score: result.documentSentiment.score,
+        place_id: reviews.place_id,
+        averageStars: averageStars,
+        totalReviews: totalCount,
     };
-  }
+}
 
   /**
    * Fetch place reviews and analyze their sentiment.
@@ -387,10 +415,9 @@ export class GooglemapsPlaceService {
     const scores = await Promise.all(
       filteredReviews.map((reviews) => this.analyzeSentiment(reviews)),
     );
-    const filteredScores = scores.filter((result) => result.score >= 0);
 
     // Sort scores in descending order
-    const sortedScores = filteredScores.sort((a, b) => b.score - a.score);
+    const sortedScores = scores.sort((a, b) => b.score - a.score);
     return sortedScores;
   }
 
@@ -815,7 +842,6 @@ export class GooglemapsPlaceService {
         if (Object.keys(availablePlaces).length === 0) {
           break;
         }
-        console.log('Place', i, availablePlaces);
         const optimalPath = await this.nearestNeighborTSPForDay(
           availablePlaces,
           startPlace,
@@ -925,14 +951,40 @@ export class GooglemapsPlaceService {
     return path;
   }
 
+  // async travelTime(point1, point2) {
+  //   const dist = Math.sqrt(
+  //     Math.pow(point1.lat - point2.lat, 2) +
+  //       Math.pow(point1.lng - point2.lng, 2),
+  //   );
+  //   return dist * 10;
+  // }
   async travelTime(point1, point2) {
-    const dist = Math.sqrt(
-      Math.pow(point1.lat - point2.lat, 2) +
-        Math.pow(point1.lng - point2.lng, 2),
-    );
-    return dist * 10;
+    const R = 6371;
+  
+    const lat1 = point1.lat;
+    const lng1 = point1.lng;
+    const lat2 = point2.lat;
+    const lng2 = point2.lng;
+  
+    const dLat = this.deg2rad(lat2 - lat1);
+    const dLng = this.deg2rad(lng2 - lng1);
+  
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+    const distance = R * c; 
+  
+    const averageSpeed = 50; 
+    const travelTime = (distance / averageSpeed) * 60; 
+  
+    return travelTime;
   }
-
+  private deg2rad(deg) {
+    return deg * (Math.PI / 180);
+  }
   async convertMinutesToTime(minutes) {
     const hours = Math.floor(minutes / 60) + 6;
     const mins = Math.floor(minutes % 60);

@@ -199,10 +199,51 @@ export class PlanService {
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
+      const planDetails = plan.planPlaceDetails.reduce((acc, detail) => {
+        const date = new Date(detail.currentDate).toISOString();
+        if (!acc[date]) {
+          acc[date] = [];
+        }
+
+        acc[date].push({
+          type: detail.type,
+          place_id: detail.place.place_id,
+          lat: detail.place.geometry.location.lat,
+          lng: detail.place.geometry.location.lng,
+          score: detail.place.rating || 0,
+          visitTime: detail.averageTime,
+          position: detail.indexOfDate,
+          fromTime: detail.fromTime,
+          nextTime: detail.nextTime,
+          currentDate: detail.currentDate,
+          details: {
+            formatted_address: detail.place.formatted_address,
+            geometry: detail.place.geometry,
+            name: detail.place.name,
+            photos: detail.place.photos,
+            place_id: detail.place.place_id,
+            rating: detail.place.rating,
+            user_ratings_total: detail.place.user_ratings_total,
+            website: detail.place.website,
+          },
+        });
+
+        return acc;
+      }, {});
+
+      const result = {
+        userId: plan.userId,
+        date_range: [plan.startDate, plan.endDate],
+        startPlaceId: plan.startPlaceId,
+        startLocation: plan.startLocation,
+        types: plan.types,
+        city: plan.city,
+        placeList: planDetails,
+      };
 
       const sheetDetail = this.googleSheetsService.createSpreadsheet(
         'Plan',
-        plan,
+        result,
       );
       if (sheetDetail) return sheetDetail;
     } catch (error) {

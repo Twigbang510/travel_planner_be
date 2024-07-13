@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { AppConfigService } from '../config/app-config.service';
+import { formatDateReadable } from 'src/utils/helpers';
+
 @Injectable()
 export class GoogleSheetsService {
   private sheets: any;
@@ -30,9 +32,7 @@ export class GoogleSheetsService {
         },
       },
     };
-    const dataAppend = {
-      data: data.dataValues,
-    };
+
     try {
       const response = await this.sheets.spreadsheets.create(request);
       console.log(`Spreadsheet created:`, response.data);
@@ -42,11 +42,12 @@ export class GoogleSheetsService {
         spreadsheetUrl: response.data.spreadsheetUrl,
       };
       await this.setSpreadsheetPublic(spreadDetail.spreadsheetId);
-      await this.appendData(
+      const numRows = await this.appendData(
         spreadDetail.spreadsheetId,
         spreadDetail.speadTitle,
-        dataAppend,
+        data,
       );
+      await this.formatSheet(spreadDetail.spreadsheetId, numRows);
       return spreadDetail;
     } catch (err) {
       console.error('Error creating spreadsheet:', err);
@@ -79,33 +80,44 @@ export class GoogleSheetsService {
     }
   }
 
-  async appendData(spreadsheetId: string, sheetTitle: string, data: any) {
+  async appendData(spreadsheetId: string, sheetTitle: string, data: any): Promise<number> {
     console.log('Append DAta', data);
     const rows = [
-      ['startDate', data.data.startDate],
-      ['endDate', data.data.endDate],
+      ['Start Date', formatDateReadable(data.date_range[0])],
+      ['End Date', formatDateReadable(data.date_range[1])],
+      ['City', data.city],
       [],
-      [
-        'Address',
-        'name',
-        'Average Time',
-        'From Time',
-        'Next Time',
-        'Position',
-        'Date',
-      ],
+      ['Date', 'Position', 'Address', 'name', 'Average Time', 'From Time', 'Next Time'],
     ];
 
-    data.data.planPlaceDetails.forEach((detail) => {
-      rows.push([
-        detail.place.formatted_address,
-        detail.place.name,
-        detail.averageTime,
+    const mergeRequests = [];
+
+    Object.keys(data.placeList).forEach((date) => {
+      const dateRows = data.placeList[date].map((detail, index) => [
+        index === 0 ? formatDateReadable(date) : '',
+        detail.position,
+        detail.details.formatted_address,
+        detail.details.name,
+        detail.visitTime,
         detail.fromTime,
         detail.nextTime,
-        detail.position,
-        detail.currentDate,
       ]);
+      rows.push(...dateRows);
+
+      if (dateRows.length > 1) {
+        mergeRequests.push({
+          mergeCells: {
+            range: {
+              sheetId: 0,
+              startRowIndex: rows.length - dateRows.length,
+              endRowIndex: rows.length,
+              startColumnIndex: 0,
+              endColumnIndex: 1,
+            },
+            mergeType: 'MERGE_ALL',
+          },
+        });
+      }
     });
 
     const request = {
@@ -124,8 +136,18 @@ export class GoogleSheetsService {
       console.error('Error appending data:', error);
       throw error;
     }
-  }
 
+    if (mergeRequests.length > 0) {
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: {
+          requests: mergeRequests,
+        },
+      });
+    }
+
+    return rows.length;
+  }
   async shareSpreadsheet(spreadsheetId: string, email: string) {
     const request = {
       fileId: spreadsheetId,
@@ -159,6 +181,79 @@ export class GoogleSheetsService {
       console.log(`Spreadsheet set to public:`, response.data);
     } catch (error) {
       console.error('Error setting spreadsheet to public:', error);
+      throw error;
+    }
+  }
+
+  async formatSheet(spreadsheetId: string, numRows: number) {
+    const requests = [
+      {
+        repeatCell: {
+          range: {
+            sheetId: 0,
+            startRowIndex: 0,
+            endRowIndex: 5,
+            startColumnIndex: 0,
+            endColumnIndex: 7,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: {
+                red: 0.8,
+                green: 0.8,
+                blue: 0.8,
+              },
+              horizontalAlignment: 'CENTER',
+              textFormat: {
+                fontSize: 12,
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+        },
+      },
+      {
+        repeatCell: {
+          range: {
+            sheetId: 0,
+            startRowIndex: 4,
+            endRowIndex: numRows,
+            startColumnIndex: 1,
+            endColumnIndex: 2,
+          },
+          cell: {
+            userEnteredFormat: {
+              horizontalAlignment: 'CENTER',
+            },
+          },
+          fields: 'userEnteredFormat(horizontalAlignment)',
+        },
+      },
+      {
+        autoResizeDimensions: {
+          dimensions: {
+            sheetId: 0,
+            dimension: 'COLUMNS',
+            startIndex: 0,
+            endIndex: 7,
+          },
+        },
+      },
+    ];
+
+    const request = {
+      spreadsheetId,
+      resource: {
+        requests,
+      },
+    };
+
+    try {
+      const response = await this.sheets.spreadsheets.batchUpdate(request);
+      console.log('Sheet formatted:', response.data);
+    } catch (error) {
+      console.error('Error formatting sheet:', error);
       throw error;
     }
   }

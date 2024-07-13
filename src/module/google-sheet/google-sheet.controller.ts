@@ -30,7 +30,7 @@ export class GoogleSheetsController {
     @Body() createSheetDto: { spreadsheetId: string; sheetTitle: string },
   ) {
     const { spreadsheetId, sheetTitle } = createSheetDto;
-    await this.googleSheetsService.createSheet(spreadsheetId, sheetTitle);
+    await this.googleSheetsService.createSpreadsheet(spreadsheetId, sheetTitle);
   }
 
   @Post('append-data')
